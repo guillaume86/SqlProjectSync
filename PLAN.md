@@ -18,31 +18,34 @@ We therefore drop the entire VS-internal-proxy / MSBuildLocator / FolderStructur
 
 ## Phases
 
-### Phase 0 — Bootstrap (done in this commit)
+### Phase 0 — Bootstrap (done — `d7ca884`)
 
 - `git init -b main`
 - `.gitignore` (dotnet template), `.gitattributes`, `.editorconfig`, `LICENSE` (MIT), `README.md`, `PLAN.md`, `CLAUDE.md`
 - Initial commit: `chore: bootstrap repo`
 
-### Phase 1 — Solution scaffold and shared build config
+### Phase 1 — Solution scaffold and shared build config (done — `afd8d5b`)
 
 Layout:
 
 ```
 SqlProjectSync/
-├── SqlProjectSync.sln
+├── SqlProjectSync.slnx
 ├── Directory.Build.props
 ├── Directory.Packages.props
 ├── src/
 │   ├── SqlProjectSync/             # core library (packable)
 │   └── SqlProjectSync.Tool/        # CLI global tool (packable)
 └── tests/
-    ├── SqlProjectSync.Tests/                  # unit tests (xUnit v3)
-    ├── SqlProjectSync.IntegrationTests/       # LocalDB-backed
+    ├── Directory.Build.props                 # suppresses CA1707 (xUnit underscore names) for test projects
+    ├── SqlProjectSync.Tests/                 # unit tests (xUnit v3, MTP runner)
+    ├── SqlProjectSync.IntegrationTests/      # LocalDB-backed
     └── Fixtures/
-        ├── SdkStyleTestProject/               # Microsoft.Build.Sql SDK fixture
-        └── LegacyTestProject/                 # legacy .sqlproj fixture (best-effort)
+        ├── SdkStyleTestProject/              # Microsoft.Build.Sql SDK fixture (Phase 4)
+        └── LegacyTestProject/                # legacy .sqlproj fixture, best-effort (Phase 4)
 ```
+
+Solution file: the new XML `.slnx` format (net10 SDK), not the legacy `.sln`.
 
 `Directory.Build.props` (applies to all projects):
 
@@ -56,6 +59,8 @@ SqlProjectSync/
 - `Deterministic=true`
 - Common metadata: `Authors`, `Company`, `RepositoryUrl`, `PackageProjectUrl`.
 
+Test-runner choice: xUnit v3 over the **Microsoft Testing Platform** (MTP), not VSTest. Test projects set `OutputType=Exe`, `UseMicrosoftTestingPlatformRunner=true`, and `TestingPlatformDotnetTestSupport=true`. `xunit.v3` brings the MTP host transitively, so there is no `Microsoft.NET.Test.Sdk` or `xunit.runner.visualstudio` reference. MTP exits with code 8 on a truly empty test run, so each test project ships a tiny `ScaffoldTests.Test_Infrastructure_Is_Wired` smoke test until real tests land in Phase 5.
+
 `Directory.Packages.props` — `ManagePackageVersionsCentrally=true`. Versions pinned to the latest stable on nuget.org as of 2026-05-12:
 
 | Package | Version | Notes |
@@ -68,8 +73,7 @@ SqlProjectSync/
 | `Microsoft.Extensions.Configuration.Json` | `10.0.7` | `appsettings.json`. |
 | `Microsoft.Extensions.Configuration.EnvironmentVariables` | `10.0.7` | env-var override. |
 | `Microsoft.Data.SqlClient` | `7.0.1` | LocalDB connections in integration tests. |
-| `Microsoft.NET.Test.Sdk` | `18.5.1` | xUnit test host. |
-| `xunit.v3` | `3.2.2` | GA. |
+| `xunit.v3` | `3.2.2` | GA. Brings the MTP test host transitively. |
 | `Shouldly` | `4.3.0` | Replaces FluentAssertions (FA 8.x is commercial-licensed). |
 | `coverlet.collector` | `10.0.0` | Coverage. |
 | `Microsoft.Build.Sql` | `2.1.0` | SDK referenced from the SDK fixture's `.sqlproj`. |
