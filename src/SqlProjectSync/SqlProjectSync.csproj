@@ -20,4 +20,9 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="SqlProjectSync.Tests" />
+    <InternalsVisibleTo Include="SqlProjectSync.IntegrationTests" />
+  </ItemGroup>
+
 </Project>
