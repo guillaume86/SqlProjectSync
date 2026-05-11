@@ -18,13 +18,13 @@ We therefore drop the entire VS-internal-proxy / MSBuildLocator / FolderStructur
 
 ## Phases
 
-### Phase 0 — Bootstrap (done — `d7ca884`)
+### Phase 0 — Bootstrap (done)
 
 - `git init -b main`
 - `.gitignore` (dotnet template), `.gitattributes`, `.editorconfig`, `LICENSE` (MIT), `README.md`, `PLAN.md`, `CLAUDE.md`
 - Initial commit: `chore: bootstrap repo`
 
-### Phase 1 — Solution scaffold and shared build config (done — `afd8d5b`)
+### Phase 1 — Solution scaffold and shared build config (done)
 
 Layout:
 
@@ -82,7 +82,7 @@ When bumping any of these later, verify the version on nuget.org and record vers
 
 Commit: `chore: scaffold solution and shared build props`
 
-### Phase 2 — Core library (`src/SqlProjectSync/`)
+### Phase 2 — Core library (done)
 
 Small public surface:
 
@@ -123,6 +123,13 @@ return PublishResult.FromDacFx(publish);
 ```
 
 Explicit non-features (deletions vs the legacy repo): no `ProjectModel`/XDocument patching, no `ProjectBuilder`/MSBuild orchestration, no `FolderStructure` table, no `MSBuildLocator`, no VS proxies.
+
+**Follow-on items** (defer to Phases 3 / 5):
+
+- `ScmpModel.LoadOptionsViaReflection` is a defensive stub that probes for a private `SchemaComparison.LoadFromXml` static method and otherwise logs and returns `null`. If the Phase 3 smoke against the legacy fixture shows that DacFx's public `new SchemaComparison(scmpPath)` rejects project-target `.scmp` files, the stub needs a real internal-symbol target — inspect `Microsoft.SqlServer.Dac.dll` (ILSpy or `dotnet-ildasm`) at that point and wire the concrete internal type.
+- `ScmpModel.Save` is not implemented; Phase 5's planned `Save_RoundTripsXml` unit test must either add a minimal `Save(string path)` (round-trip the parsed `XDocument`) or drop the test.
+- `SchemaSync.Apply` passes the project **directory** (not the `.sqlproj` file path) to `PublishChangesToProject` — confirm this matches the first-party `SchemaComparePublishProjectChangesOperation.cs` reference when wiring the CLI in Phase 3 and adjust if the API expects the file path.
+- `ScmpModel.CopyOptions` reflects over the public read/write properties of DacFx's `SchemaComparison.Options` runtime type. If a future DacFx version exposes a read-only or non-copyable property, the reflection-based copy will throw at runtime — verify against the live `SchemaCompareOptions` shape in Phase 5 integration tests.
 
 Commit: `feat(core): implement schema sync over DacFx PublishChangesToProject`
 
