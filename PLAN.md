@@ -143,7 +143,7 @@ Commit: `feat(core): implement schema sync over DacFx PublishChangesToProject`
 
 Commit: `feat(tool): add sync verb backed by SchemaSync`
 
-### Phase 4 — Test fixtures
+### Phase 4 — Test fixtures (done)
 
 Build two minimal fixtures from scratch (do **not** copy `tests/TestSqlProject` from the legacy repo):
 

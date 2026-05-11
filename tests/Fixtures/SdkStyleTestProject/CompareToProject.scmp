@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SchemaComparison>
+  <Version>10</Version>
+  <SourceModelProvider>
+    <ConnectionBasedModelProvider>
+      <ConnectionString>Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=SdkStyleTestProject;Integrated Security=True;Encrypt=False;TrustServerCertificate=True</ConnectionString>
+    </ConnectionBasedModelProvider>
+  </SourceModelProvider>
+  <TargetModelProvider>
+    <ProjectBasedModelProvider>
+      <ProjectGuid>{B0F0F0F0-1111-2222-3333-444444444444}</ProjectGuid>
+      <Name>SdkStyleTestProject</Name>
+    </ProjectBasedModelProvider>
+  </TargetModelProvider>
+  <SchemaCompareSettingsService>
+    <SchemaCompareSettingsService>
+      <PropertyElementName>
+        <Name>SchemaCompareSettingsServiceVersion</Name>
+        <Value>10</Value>
+      </PropertyElementName>
+    </SchemaCompareSettingsService>
+  </SchemaCompareSettingsService>
+  <SchemaCompareViewSettings>
+    <GroupBy>SchemaName</GroupBy>
+    <ZoomLevel>100</ZoomLevel>
+    <Filter>NonSkipObjects</Filter>
+  </SchemaCompareViewSettings>
+</SchemaComparison>
