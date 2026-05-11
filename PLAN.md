@@ -217,7 +217,7 @@ Commit: `ci: github actions for build, test, release, and nightly legacy compat`
 - The cron in `legacy-compat.yml` is 03:30 UTC daily; adjust to match maintainer timezone preferences.
 - The CI workflow caches packages by `Directory.Packages.props` hash. If we add a `global.json` pinning the SDK or a `nuget.config` with internal feeds, extend the cache key accordingly.
 
-### Phase 7 — Final docs polish
+### Phase 7 — Final docs polish (done)
 
 Refresh `README.md` with real install/usage commands once the tool builds end-to-end. Add a `CHANGELOG.md` keyed to git tags.
 
