@@ -133,7 +133,7 @@ Explicit non-features (deletions vs the legacy repo): no `ProjectModel`/XDocumen
 
 Commit: `feat(core): implement schema sync over DacFx PublishChangesToProject`
 
-### Phase 3 — CLI (`src/SqlProjectSync.Tool/`)
+### Phase 3 — CLI (done)
 
 - Packable as a .NET global tool: `PackAsTool=true`, `ToolCommandName=sqlproj-sync`, `PackageOutputPath=../../artifacts`.
 - `System.CommandLine` 2.0.7 root command with verb `sync`:
