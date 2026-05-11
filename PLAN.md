@@ -202,13 +202,20 @@ Commits:
 - Fixture DSP was downgraded from `Sql160` (SQL Server 2022) to `Sql150` (SQL Server 2019) to match LocalDB on the development machine. CI should ideally test against the highest LocalDB version the hosted runner offers; consider `windows-latest` (typically MSSQLLocalDB 2019) and possibly a matrix that includes a SQL Server 2022 container in Phase 6.
 - The integration tests warm up cold (~10s per test due to per-test DB create + dacpac publish). Acceptable for now; if the suite grows, consider an `IClassFixture` that owns one DB per scenario class and uses `BEGIN/ROLLBACK TRAN` or schema-level resets between tests.
 
-### Phase 6 — CI (GitHub Actions)
+### Phase 6 — CI (GitHub Actions) (done)
 
 - `.github/workflows/ci.yml` — PR + push to `main`; `windows-latest` (LocalDB); `actions/setup-dotnet@v4` with `dotnet-version: 10.0.x`; `dotnet build -c Release` + `dotnet test --filter "Style!=Legacy"`.
 - `.github/workflows/release.yml` — tag `v*`; `dotnet pack` both packable projects to `artifacts/`; push to NuGet.org gated on `secrets.NUGET_API_KEY`.
 - `.github/workflows/legacy-compat.yml` — `workflow_dispatch` + nightly cron; `--filter "Style=Legacy"` with `continue-on-error: true`.
 
 Commit: `ci: github actions for build, test, release, and nightly legacy compat`
+
+**Follow-on items**:
+
+- `release.yml` packs and pushes to NuGet.org gated on the `NUGET_API_KEY` secret. Set that secret in the repository settings before tagging a release, otherwise the push step silently no-ops (the artifacts are still uploaded to the workflow run).
+- `release.yml` runs on `ubuntu-latest` because `dotnet pack` does not need LocalDB. If a future release step needs to run integration tests against the .dacpac as a smoke check, split into a windows job that runs tests and an ubuntu job that packs/publishes.
+- The cron in `legacy-compat.yml` is 03:30 UTC daily; adjust to match maintainer timezone preferences.
+- The CI workflow caches packages by `Directory.Packages.props` hash. If we add a `global.json` pinning the SDK or a `nuget.config` with internal feeds, extend the cache key accordingly.
 
 ### Phase 7 — Final docs polish
 
