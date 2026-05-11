@@ -1,0 +1,16 @@
+# Default to text, autodetect EOL
+* text=auto eol=lf
+
+# Windows-flavoured project files
+*.sln       text eol=crlf
+*.csproj    text eol=crlf
+*.props     text eol=crlf
+*.targets   text eol=crlf
+
+# Treat as binary
+*.dacpac    binary
+*.bacpac    binary
+*.png       binary
+*.jpg       binary
+*.ico       binary
+*.snk       binary
