@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SqlProjectSync.Tool/SqlProjectSync.Tool.csproj" />
+    <Project Path="src/SqlProjectSync/SqlProjectSync.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SqlProjectSync.IntegrationTests/SqlProjectSync.IntegrationTests.csproj" />
+    <Project Path="tests/SqlProjectSync.Tests/SqlProjectSync.Tests.csproj" />
+  </Folder>
+</Solution>

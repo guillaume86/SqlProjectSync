@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>SqlProjectSync.Tool</RootNamespace>
+    <AssemblyName>sqlproj-sync</AssemblyName>
+
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>sqlproj-sync</ToolCommandName>
+    <PackageId>SqlProjectSync.Tool</PackageId>
+    <Description>dotnet global tool that syncs a SQL Server database schema into a .sqlproj via DacFx.</Description>
+    <PackageTags>sqlproj;sql-server;dacfx;schema-compare;dotnet-tool;cli</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageOutputPath>$(MSBuildThisFileDirectory)../../artifacts</PackageOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SqlProjectSync\SqlProjectSync.csproj" />
+  </ItemGroup>
+
+</Project>
