@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Name>SdkStyleTestProject</Name>
     <ProjectGuid>{B0F0F0F0-1111-2222-3333-444444444444}</ProjectGuid>
-    <DSP>Microsoft.Data.Tools.Schema.Sql.Sql160DatabaseSchemaProvider</DSP>
+    <DSP>Microsoft.Data.Tools.Schema.Sql.Sql150DatabaseSchemaProvider</DSP>
     <DefaultSchema>dbo</DefaultSchema>
     <DefaultCollation>SQL_Latin1_General_CP1_CI_AS</DefaultCollation>
   </PropertyGroup>
