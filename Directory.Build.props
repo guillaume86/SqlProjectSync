@@ -27,8 +27,19 @@
     <MinVerTagPrefix>v</MinVerTagPrefix>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <!-- Source Link: embed repo + commit metadata in PDBs so consumers can step into our source
+         from a debugger. PublishRepositoryUrl exposes the URL in the package; EmbedUntrackedSources
+         covers generated files (e.g. assembly-info) that aren't in the git index. -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <!-- Set by CI; normalizes PDB paths so symbol/source validation passes. -->
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="MinVer" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
   </ItemGroup>
 
 </Project>
