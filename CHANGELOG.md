@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0] — 2026-05-12
+
 ### Added
 
 - `SchemaSync` static facade (`Compare`, `Apply`) backed by DacFx's public
@@ -55,7 +57,3 @@ Tags use the `v` prefix (e.g. `v0.1.0`); untagged builds emit
 `0.0.0-alpha.0.<commit-height>+<sha>`. The CI workflows fetch full git history
 (`fetch-depth: 0`) so MinVer can see the tags.
 
-## [0.1.0] — Unreleased
-
-Initial public release will be tagged `v0.1.0` once Phase 7 lands and the test
-matrix has run green in CI. Until then this changelog tracks unreleased work.
