@@ -15,9 +15,9 @@
     <Authors>Guillaume Lecomte</Authors>
     <Company>Guillaume Lecomte</Company>
     <Copyright>Copyright (c) Guillaume Lecomte</Copyright>
-    <RepositoryUrl>https://github.com/Guillaume86/SqlProjectSync</RepositoryUrl>
+    <RepositoryUrl>https://github.com/guillaume86/SqlProjectSync</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageProjectUrl>https://github.com/Guillaume86/SqlProjectSync</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/guillaume86/SqlProjectSync</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
