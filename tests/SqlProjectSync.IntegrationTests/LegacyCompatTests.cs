@@ -9,14 +9,13 @@ namespace SqlProjectSync.IntegrationTests;
 /// SSDT-style fixture. The DB schema is published from the SDK-built .dacpac (both
 /// fixtures share the same object set), only the target <c>.sqlproj</c> differs.
 ///
-/// Best-effort — gated on the <c>SQLPROJECTSYNC_RUN_LEGACY=1</c> environment variable.
-/// CI does not block on these passing.
+/// The two <c>_AndBuildItem_</c> tests currently fail: DacFx's
+/// <c>PublishChangesToProject</c> writes/deletes <c>.sql</c> files on disk but does not
+/// mutate the legacy <c>.sqlproj</c> XML. See <c>PLAN.md</c> Phase 5 follow-on notes.
 /// </summary>
 [Trait("Style", "Legacy")]
 public class LegacyCompatTests : IClassFixture<LocalDbFixture>
 {
-    private const string GateEnvVar = "SQLPROJECTSYNC_RUN_LEGACY";
-
     private readonly LocalDbFixture _fixture;
 
     public LegacyCompatTests(LocalDbFixture fixture)
@@ -27,7 +26,6 @@ public class LegacyCompatTests : IClassFixture<LocalDbFixture>
     [Fact]
     public async Task Compare_NoFileLevelChanges_WhenDbMatchesProject()
     {
-        SkipIfLegacyGateClosed();
         SkipIfLocalDbUnavailable();
 
         await using var ctx = await SyncTestContext.CreateAsync(_fixture, RepoLayout.LegacyFixtureDirectory);
@@ -47,7 +45,6 @@ public class LegacyCompatTests : IClassFixture<LocalDbFixture>
     [Fact]
     public async Task Apply_RemovesSqlFile_AndBuildItem_WhenTableDroppedInDb()
     {
-        SkipIfLegacyGateClosed();
         SkipIfLocalDbUnavailable();
 
         await using var ctx = await SyncTestContext.CreateAsync(_fixture, RepoLayout.LegacyFixtureDirectory);
@@ -68,7 +65,6 @@ public class LegacyCompatTests : IClassFixture<LocalDbFixture>
     [Fact]
     public async Task Apply_AddsSqlFile_AndBuildItem_WhenTableAddedInDb()
     {
-        SkipIfLegacyGateClosed();
         SkipIfLocalDbUnavailable();
 
         await using var ctx = await SyncTestContext.CreateAsync(_fixture, RepoLayout.LegacyFixtureDirectory);
@@ -101,14 +97,6 @@ public class LegacyCompatTests : IClassFixture<LocalDbFixture>
             .Select(e => e.Attribute("Include")?.Value ?? string.Empty)
             .Where(v => !string.IsNullOrEmpty(v))
             .ToList();
-    }
-
-    private static void SkipIfLegacyGateClosed()
-    {
-        if (Environment.GetEnvironmentVariable(GateEnvVar) != "1")
-        {
-            Assert.Skip($"Legacy compat suite gated on {GateEnvVar}=1.");
-        }
     }
 
     private void SkipIfLocalDbUnavailable()

@@ -10,8 +10,6 @@ jobs:
   legacy-tests:
     runs-on: windows-latest
     continue-on-error: true
-    env:
-      SQLPROJECTSYNC_RUN_LEGACY: '1'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
