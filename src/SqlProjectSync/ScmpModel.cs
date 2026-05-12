@@ -6,6 +6,12 @@ using Microsoft.SqlServer.Dac.Compare;
 
 namespace SqlProjectSync;
 
+internal enum ScmpShape
+{
+    Legacy,
+    Modern,
+}
+
 internal interface IModelProvider
 {
 }
@@ -14,18 +20,24 @@ internal sealed record ConnectionBasedModelProvider(string ConnectionString) : I
 
 internal sealed record FileBasedModelProvider(string Name, string DatabaseFileName) : IModelProvider;
 
-internal sealed record ProjectBasedModelProvider(Guid ProjectGuid, string Name) : IModelProvider;
+internal sealed record ProjectBasedModelProvider(Guid ProjectGuid, string Name, string? ProjectFilePath = null) : IModelProvider;
 
 internal sealed class ScmpModel
 {
-    private ScmpModel(string scmpPath, IModelProvider source, IModelProvider target)
+    private readonly XDocument _doc;
+
+    private ScmpModel(string scmpPath, XDocument doc, ScmpShape shape, IModelProvider source, IModelProvider target)
     {
         ScmpPath = scmpPath;
+        _doc = doc;
+        Shape = shape;
         Source = source;
         Target = target;
     }
 
     public string ScmpPath { get; }
+
+    public ScmpShape Shape { get; }
 
     public IModelProvider Source { get; }
 
@@ -55,10 +67,14 @@ internal sealed class ScmpModel
         var root = doc.Root
             ?? throw new SchemaSyncException($"'{scmpPath}' has no root element.");
 
-        var source = ReadProvider(root, "SourceModelProvider", scmpPath);
-        var target = ReadProvider(root, "TargetModelProvider", scmpPath);
+        var shape = DetectShape(root);
+        var fullPath = Path.GetFullPath(scmpPath);
+        var scmpDir = Path.GetDirectoryName(fullPath) ?? Directory.GetCurrentDirectory();
 
-        return new ScmpModel(Path.GetFullPath(scmpPath), source, target);
+        var source = ReadProvider(root, "SourceModelProvider", scmpPath, scmpDir);
+        var target = ReadProvider(root, "TargetModelProvider", scmpPath, scmpDir);
+
+        return new ScmpModel(fullPath, doc, shape, source, target);
     }
 
     public string GetTargetProjectPath()
@@ -67,6 +83,17 @@ internal sealed class ScmpModel
         {
             throw new SchemaSyncException(
                 $"Target provider is {Target.GetType().Name}; cannot resolve a .sqlproj path.");
+        }
+
+        if (p.ProjectFilePath is { } resolvedPath)
+        {
+            if (!File.Exists(resolvedPath))
+            {
+                throw new SchemaSyncException(
+                    $"Target .sqlproj '{resolvedPath}' referenced by '{ScmpPath}' does not exist.");
+            }
+
+            return resolvedPath;
         }
 
         var dir = Path.GetDirectoryName(ScmpPath);
@@ -106,26 +133,22 @@ internal sealed class ScmpModel
 
     public void ApplyOptionsAndExclusions(SchemaComparison comparison, ILogger logger)
     {
-        SchemaComparison? parsed;
+        if (Shape == ScmpShape.Legacy)
+        {
+            LegacyScmpReader.Apply(_doc, ScmpPath, comparison, logger);
+            return;
+        }
+
+        SchemaComparison parsed;
         try
         {
             parsed = new SchemaComparison(ScmpPath);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(
-                ex,
-                "DacFx could not load '{Scmp}' directly; attempting reflection fallback.",
-                ScmpPath);
-            parsed = LoadOptionsViaReflection(ScmpPath, logger);
-        }
-
-        if (parsed is null)
-        {
-            logger.LogWarning(
-                "Proceeding with DacFx default options; .scmp options not applied for '{Scmp}'.",
-                ScmpPath);
-            return;
+            throw new SchemaSyncException(
+                $"DacFx failed to load modern-shape .scmp '{ScmpPath}': {ex.Message}",
+                ex);
         }
 
         CopyOptions(parsed.Options, comparison.Options);
@@ -133,7 +156,27 @@ internal sealed class ScmpModel
         CopyCollection(parsed.ExcludedTargetObjects, comparison.ExcludedTargetObjects);
     }
 
-    private static IModelProvider ReadProvider(XElement root, string parentName, string scmpPath)
+    private static ScmpShape DetectShape(XElement root)
+    {
+        // Look at the target provider only — sources are DB/dacpac in our flow.
+        var targetProject = root
+            .Elements()
+            .FirstOrDefault(e => string.Equals(e.Name.LocalName, "TargetModelProvider", StringComparison.Ordinal))
+            ?.Elements()
+            .FirstOrDefault(e => string.Equals(e.Name.LocalName, "ProjectBasedModelProvider", StringComparison.Ordinal));
+
+        if (targetProject is null)
+        {
+            return ScmpShape.Modern;
+        }
+
+        var hasProjectFilePath = targetProject.Elements()
+            .Any(e => string.Equals(e.Name.LocalName, "ProjectFilePath", StringComparison.Ordinal));
+
+        return hasProjectFilePath ? ScmpShape.Modern : ScmpShape.Legacy;
+    }
+
+    private static IModelProvider ReadProvider(XElement root, string parentName, string scmpPath, string scmpDir)
     {
         var parent = root.Elements()
             .FirstOrDefault(e => string.Equals(e.Name.LocalName, parentName, StringComparison.Ordinal))
@@ -149,12 +192,27 @@ internal sealed class ScmpModel
             "FileBasedModelProvider" => new FileBasedModelProvider(
                 ChildValueOptional(provider, "Name") ?? string.Empty,
                 ChildValue(provider, "DatabaseFileName", scmpPath)),
-            "ProjectBasedModelProvider" => new ProjectBasedModelProvider(
-                ParseGuid(ChildValueOptional(provider, "ProjectGuid"), scmpPath),
-                ChildValue(provider, "Name", scmpPath)),
+            "ProjectBasedModelProvider" => ReadProjectProvider(provider, scmpPath, scmpDir),
             var name => throw new SchemaSyncException(
                 $"'{scmpPath}' has unknown provider element <{name}>."),
         };
+    }
+
+    private static ProjectBasedModelProvider ReadProjectProvider(XElement provider, string scmpPath, string scmpDir)
+    {
+        var projectFilePath = ChildValueOptional(provider, "ProjectFilePath");
+        if (!string.IsNullOrWhiteSpace(projectFilePath))
+        {
+            var resolved = Path.IsPathRooted(projectFilePath)
+                ? Path.GetFullPath(projectFilePath)
+                : Path.GetFullPath(Path.Combine(scmpDir, projectFilePath));
+            var name = Path.GetFileNameWithoutExtension(resolved);
+            return new ProjectBasedModelProvider(Guid.Empty, name, resolved);
+        }
+
+        return new ProjectBasedModelProvider(
+            ParseGuid(ChildValueOptional(provider, "ProjectGuid"), scmpPath),
+            ChildValue(provider, "Name", scmpPath));
     }
 
     private static string ChildValue(XElement parent, string localName, string scmpPath)
@@ -173,7 +231,12 @@ internal sealed class ScmpModel
 
     private static Guid ParseGuid(string? raw, string scmpPath)
     {
-        if (raw is null || !Guid.TryParse(raw, out var g))
+        if (raw is null)
+        {
+            return Guid.Empty;
+        }
+
+        if (!Guid.TryParse(raw, out var g))
         {
             throw new SchemaSyncException(
                 $"'{scmpPath}' ProjectGuid '{raw}' is not a valid GUID.");
@@ -209,36 +272,6 @@ internal sealed class ScmpModel
         foreach (var item in from)
         {
             to.Add(item);
-        }
-    }
-
-    // Fallback when DacFx's public SchemaComparison(scmpPath) constructor rejects a
-    // project-target .scmp. The exact internal symbol used by DacFx to deserialize a
-    // .scmp without endpoint validation is version-dependent; if not present, we log
-    // and return null so the compare runs with DacFx default options.
-    private static SchemaComparison? LoadOptionsViaReflection(string scmpPath, ILogger logger)
-    {
-        try
-        {
-            var loadMethod = typeof(SchemaComparison).GetMethod(
-                "LoadFromXml",
-                BindingFlags.Static | BindingFlags.NonPublic);
-
-            if (loadMethod is not null)
-            {
-                var xml = XDocument.Load(scmpPath);
-                return loadMethod.Invoke(null, [xml]) as SchemaComparison;
-            }
-
-            logger.LogWarning(
-                "No internal SCMP loader found on {Type}; cannot apply .scmp options.",
-                typeof(SchemaComparison).FullName);
-            return null;
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Reflection fallback failed for '{Scmp}'.", scmpPath);
-            return null;
         }
     }
 }

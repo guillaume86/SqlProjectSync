@@ -25,6 +25,26 @@ public class ScmpModelTests
         </SchemaComparison>
         """;
 
+    private static string ModernProjectScmp(string connectionString, string projectFilePath) =>
+        $$"""
+        <?xml version="1.0" encoding="utf-8"?>
+        <SchemaComparison>
+          <Version>10</Version>
+          <SourceModelProvider>
+            <ConnectionBasedModelProvider>
+              <ConnectionString>{{connectionString}}</ConnectionString>
+            </ConnectionBasedModelProvider>
+          </SourceModelProvider>
+          <TargetModelProvider>
+            <ProjectBasedModelProvider>
+              <ProjectFilePath>{{projectFilePath}}</ProjectFilePath>
+              <TargetScripts />
+              <Dsp>170</Dsp>
+            </ProjectBasedModelProvider>
+          </TargetModelProvider>
+        </SchemaComparison>
+        """;
+
     [Fact]
     public void Load_ReturnsModel_FromValidFile()
     {
@@ -153,5 +173,78 @@ public class ScmpModelTests
             </SchemaComparison>
             """);
         Should.Throw<SchemaSyncException>(() => ScmpModel.Load(scmp));
+    }
+
+    [Fact]
+    public void Load_LegacyScmp_DetectsLegacyShape()
+    {
+        using var dir = new TempDirectory();
+        var scmp = dir.Write(
+            "Test.scmp",
+            ProjectScmp("Data Source=localhost;Database=Foo", "MyProject"));
+
+        var model = ScmpModel.Load(scmp);
+
+        model.Shape.ShouldBe(ScmpShape.Legacy);
+        model.Target.ShouldBeOfType<ProjectBasedModelProvider>();
+        ((ProjectBasedModelProvider)model.Target).ProjectFilePath.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Load_ModernScmp_DetectsModernShape_AndResolvesProjectFilePath()
+    {
+        using var dir = new TempDirectory();
+        dir.Write("My.sqlproj", "<Project Sdk=\"Microsoft.Build.Sql/2.1.0\" />");
+        var scmp = dir.Write(
+            "Test.scmp",
+            ModernProjectScmp("Data Source=localhost;Database=Foo", "./My.sqlproj"));
+
+        var model = ScmpModel.Load(scmp);
+
+        model.Shape.ShouldBe(ScmpShape.Modern);
+        var project = model.Target.ShouldBeOfType<ProjectBasedModelProvider>();
+        project.Name.ShouldBe("My");
+        project.ProjectFilePath.ShouldNotBeNull();
+        Path.GetFileName(project.ProjectFilePath).ShouldBe("My.sqlproj");
+        Path.IsPathRooted(project.ProjectFilePath).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void GetTargetProjectPath_ModernShape_ReturnsResolvedAbsolutePath()
+    {
+        using var dir = new TempDirectory();
+        var sqlproj = dir.Write("My.sqlproj", "<Project Sdk=\"Microsoft.Build.Sql/2.1.0\" />");
+        var scmp = dir.Write(
+            "Test.scmp",
+            ModernProjectScmp("Data Source=localhost;Database=Foo", "./My.sqlproj"));
+
+        var path = ScmpModel.Load(scmp).GetTargetProjectPath();
+
+        path.ShouldBe(Path.GetFullPath(sqlproj));
+    }
+
+    [Fact]
+    public void GetTargetProjectPath_ModernShape_AbsolutePath_IsHonored()
+    {
+        using var dir = new TempDirectory();
+        var sqlproj = dir.Write("My.sqlproj", "<Project Sdk=\"Microsoft.Build.Sql/2.1.0\" />");
+        var scmp = dir.Write(
+            "nested/Test.scmp",
+            ModernProjectScmp("Data Source=localhost;Database=Foo", Path.GetFullPath(sqlproj)));
+
+        var path = ScmpModel.Load(scmp).GetTargetProjectPath();
+
+        path.ShouldBe(Path.GetFullPath(sqlproj));
+    }
+
+    [Fact]
+    public void GetTargetProjectPath_ModernShape_MissingFile_Throws()
+    {
+        using var dir = new TempDirectory();
+        var scmp = dir.Write(
+            "Test.scmp",
+            ModernProjectScmp("Data Source=localhost;Database=Foo", "./Nonexistent.sqlproj"));
+
+        Should.Throw<SchemaSyncException>(() => ScmpModel.Load(scmp).GetTargetProjectPath());
     }
 }

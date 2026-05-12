@@ -6,6 +6,51 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-12
+
+### Added
+
+- `ScmpModel.Load` now accepts modern DacFx 170.x `.scmp` shape
+  (`<ProjectFilePath>` + `<TargetScripts>` + `<Dsp>` inside
+  `<ProjectBasedModelProvider>`) in addition to the legacy VS-SSDT shape
+  (`<ProjectGuid>` + `<Name>`). Shape is detected once via XDocument probe
+  and carried as an internal `ScmpShape` enum.
+- Internal `LegacyScmpReader` parses legacy `<ConfigurationOptionsElement>`
+  options and `<ExcludedSourceElements>` / `<ExcludedTargetElements>`
+  exclusions into `DacDeployOptions` and `SchemaComparisonExcludedObjectId`
+  by reflection + type coercion (bool/int/long/string/enum/nullable).
+
+### Fixed
+
+- Legacy VS-SSDT `.scmp` files now round-trip their options and exclusions.
+  DacFx 170.x rejects the legacy shape, so the previous code fell back to
+  defaults and silently dropped every `<ConfigurationOptionsElement>` entry
+  and every type/object exclusion. `LegacyScmpReader` now reads them
+  directly off the XDocument.
+- `<Value>ExcludedType</Value>` entries (legacy type-level exclusions for
+  e.g. `SqlUser`, `SqlRole`) are routed to `DacDeployOptions.ExcludeObjectTypes`
+  via the same CLR-Type → `ObjectType` mapping DacFx uses internally.
+- Older VS-SSDT per-type flags (`DoNotDropXxx=True`, `ExcludeXxx=True`) and
+  the newer `DoNotDropTypes` semicolon-list shape both contribute to
+  `DoNotDropObjectTypes` / `ExcludeObjectTypes`.
+- Case-insensitive property lookup so legacy casing drift
+  (`NoAlterStatementsToChangeCLRTypes` vs the current `…ClrTypes`) resolves.
+- Empty `<Name/>` placeholders inside `<SelectedItem>` are skipped when
+  building an `ObjectIdentifier`, matching DacFx's own
+  `SchemaCompareElementId.ReadTypeAndNamePartsFromXmlDoc` behaviour.
+- `SchemaComparison.LoadFromXml` reflection fallback removed — it never
+  resolved on DacFx 170.x.
+
+### Notes
+
+- Unknown option names that don't resolve to a `DacDeployOptions` property
+  and aren't recognised as a type-flag pattern are logged at Warning and
+  skipped (UI-only or renamed). A small allowlist of well-known non-options
+  (`PlanGenerationType`, `TargetConnectionString`, `TargetDatabaseName`,
+  `AllowExistingModelErrors`) is silently ignored.
+- Uncoercible values on known `DacDeployOptions` properties still throw
+  `SchemaSyncException`.
+
 ## [0.1.0] — 2026-05-12
 
 ### Added
