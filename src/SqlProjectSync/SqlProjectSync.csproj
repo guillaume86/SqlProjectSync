@@ -9,6 +9,11 @@
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- NU5104: stable pkg with a prerelease dependency. We deliberately pin
+         Microsoft.SqlServer.DacFx.Projects 0.5.22-preview (no stable release
+         exists; see CHANGELOG/PLAN.md). Downgrade to warning so pack succeeds
+         while keeping the message visible in build output. -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU5104</WarningsNotAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
