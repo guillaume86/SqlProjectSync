@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.SqlServer.DacFx" />
+    <PackageReference Include="Microsoft.SqlServer.DacFx.Projects" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
 

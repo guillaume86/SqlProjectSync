@@ -93,6 +93,8 @@ public static class SchemaSync
                 $"PublishChangesToProject failed for '{comparison.ProjectPath}': {publish.ErrorMessage}");
         }
 
-        return PublishResult.FromDacFx(publish);
+        var result = PublishResult.FromDacFx(publish);
+        LegacyProjectPatcher.PatchIfNeeded(comparison.ProjectPath, result, logger);
+        return result;
     }
 }

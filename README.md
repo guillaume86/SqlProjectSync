@@ -65,7 +65,7 @@ Pass a [`SyncOptions`](src/SqlProjectSync/SyncOptions.cs) record to override the
 
 Phases 0 – 6 are landed. See [PLAN.md](./PLAN.md) for what each phase covered and the per-phase follow-on items.
 
-The legacy `.sqlproj` compat suite (in `tests/SqlProjectSync.IntegrationTests/LegacyCompatTests.cs`) runs nightly in CI under [legacy-compat.yml](.github/workflows/legacy-compat.yml) with `continue-on-error: true`; two of its three tests currently fail because DacFx's `PublishChangesToProject` does not mutate the legacy `.sqlproj` XML. See [PLAN.md](./PLAN.md) Phase 5 follow-on notes.
+The legacy `.sqlproj` compat suite (in `tests/SqlProjectSync.IntegrationTests/LegacyCompatTests.cs`) runs as part of the default `dotnet test`. DacFx's `PublishChangesToProject` only writes/deletes the `.sql` files; the matching `<Build Include="..."/>` items in the legacy XML are patched afterwards by [LegacyProjectPatcher](src/SqlProjectSync/LegacyProjectPatcher.cs) using the preview `Microsoft.SqlServer.DacFx.Projects` package. The nightly [legacy-compat.yml](.github/workflows/legacy-compat.yml) workflow still runs the suite with `continue-on-error: true` as a defensive net.
 
 ## Building from source
 

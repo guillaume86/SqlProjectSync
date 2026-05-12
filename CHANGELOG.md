@@ -38,6 +38,12 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   but has never triggered in our test runs.
 - The fixture DSP is `Sql150` (SQL Server 2019) for LocalDB compatibility. Adjust
   if your environment uses a newer LocalDB.
+- Legacy `.sqlproj` `<Build Include="..."/>` items are kept in sync with on-disk
+  files via the `Microsoft.SqlServer.DacFx.Projects` preview package
+  ([LegacyProjectPatcher](src/SqlProjectSync/LegacyProjectPatcher.cs)) — DacFx's
+  own `PublishChangesToProject` only writes/deletes the `.sql` files. Adopting
+  the preview required pinning `Microsoft.SqlServer.DacFx` to
+  `170.4.77-preview`; revisit when 170.4 ships stable.
 - See [PLAN.md](./PLAN.md) for the phased implementation log and per-phase
   follow-on items.
 
