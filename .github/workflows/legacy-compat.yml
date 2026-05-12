@@ -6,6 +6,9 @@ on:
     # 03:30 UTC daily
     - cron: '30 3 * * *'
 
+permissions:
+  contents: read
+
 jobs:
   legacy-tests:
     runs-on: ubuntu-latest

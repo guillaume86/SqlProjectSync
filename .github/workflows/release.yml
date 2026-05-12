@@ -10,6 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      # Promoted to job level so the step-level `if: env.NUGET_API_KEY != ''`
+      # gate can see it — step-level env is not in scope when `if` evaluates.
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -46,12 +50,12 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: nupkgs
-          path: artifacts/*.nupkg
+          path: |
+            artifacts/*.nupkg
+            artifacts/*.snupkg
 
       - name: Push to NuGet.org
         if: ${{ env.NUGET_API_KEY != '' }}
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
           dotnet nuget push "artifacts/*.nupkg" \
             --api-key "$NUGET_API_KEY" \
