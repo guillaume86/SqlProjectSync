@@ -9,10 +9,10 @@ namespace SqlProjectSync.IntegrationTests;
 /// </summary>
 internal sealed class SyncTestContext : IAsyncDisposable
 {
-    private readonly LocalDbFixture _fixture;
+    private readonly IDatabaseFixture _fixture;
     private readonly string _tempDir;
 
-    private SyncTestContext(LocalDbFixture fixture, string tempDir, string projectPath, string scmpPath, string databaseName)
+    private SyncTestContext(IDatabaseFixture fixture, string tempDir, string projectPath, string scmpPath, string databaseName)
     {
         _fixture = fixture;
         _tempDir = tempDir;
@@ -32,7 +32,7 @@ internal sealed class SyncTestContext : IAsyncDisposable
 
     public string ProjectDirectory => Path.GetDirectoryName(ProjectPath)!;
 
-    public static async Task<SyncTestContext> CreateAsync(LocalDbFixture fixture, string fixtureDirectory)
+    public static async Task<SyncTestContext> CreateAsync(IDatabaseFixture fixture, string fixtureDirectory)
     {
         var tempDir = Path.Combine(Path.GetTempPath(), "SqlProjectSync.IntegrationTests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempDir);

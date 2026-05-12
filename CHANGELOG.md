@@ -21,8 +21,13 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `sqlproj-sync` global tool with a single `sync` verb (positional `.scmp` path,
   `--preview`, `-v|--verbosity`, `--folder-structure`).
 - SDK-style and legacy `.sqlproj` test fixtures with seven schema objects each.
-- xUnit v3 + Shouldly test suite: 24 unit tests, 5 SDK integration tests (LocalDB),
-  and a gated 3-test legacy-compat suite.
+- xUnit v3 + Shouldly test suite: 24 unit tests, 5 SDK integration tests against
+  each of two backends (LocalDB on Windows and a SQL Server 2022 Testcontainers
+  fixture on Linux) for a total of 10 backend-isolated scenarios, plus a gated
+  3-test legacy-compat suite.
+- `IDatabaseFixture` abstraction with `LocalDbFixture` and `SqlContainerFixture`
+  implementations; integration tests inherit from `SyncIntegrationTestsBase` and
+  bind a backend via `IClassFixture<T>`.
 - GitHub Actions: `ci.yml` (build + tests on Windows), `release.yml` (pack + NuGet
   push on tag), `legacy-compat.yml` (nightly best-effort legacy run).
 

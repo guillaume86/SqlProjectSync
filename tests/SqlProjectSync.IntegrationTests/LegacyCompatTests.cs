@@ -85,7 +85,7 @@ public class LegacyCompatTests : IClassFixture<LocalDbFixture>
 
     private void SkipIfLocalDbUnavailable()
     {
-        if (!_fixture.LocalDbAvailable)
+        if (!_fixture.IsAvailable)
         {
             Assert.Skip(_fixture.UnavailabilityReason ?? "LocalDB not available.");
         }
