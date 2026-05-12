@@ -4,7 +4,7 @@
 
 **SqlProjectSync** pulls a SQL Server database's schema **into** a `.sqlproj`. Modern [`Microsoft.Build.Sql`](https://github.com/microsoft/DacFx/tree/main/src/Microsoft.Build.Sql) SDK-style projects are first-class; legacy SSDT `.sqlproj` is best-effort.
 
- All schema-compare / project-publish work goes through the public DacFx APIs:
+All schema-compare / project-publish work goes through the public DacFx APIs:
 [`SchemaCompareProjectEndpoint`](https://learn.microsoft.com/en-us/dotnet/api/microsoft.sqlserver.dac.compare.schemacompareprojectendpoint) +
 [`SchemaComparisonResult.PublishChangesToProject(...)`](https://learn.microsoft.com/en-us/dotnet/api/microsoft.sqlserver.dac.compare.schemacomparisonresult.publishchangestoproject) +
 [`DacExtractTarget`](https://learn.microsoft.com/en-us/dotnet/api/microsoft.sqlserver.dac.dacextracttarget).
@@ -120,5 +120,5 @@ LocalDB connection can be overridden with `SQLPROJECTSYNC_CONNECTION`.
 
 ## When in doubt
 
- Consult it for the *behavior* we need to preserve, never for code to copy. Tests there name the scenarios we have to re-establish.
+- Consult the legacy repo for the *behavior* we need to preserve, never for code to copy. Tests there name the scenarios we have to re-establish.
 - The first-party reference implementation of "apply schema compare to a project" is in [`microsoft/sqltoolsservice` `SchemaComparePublishProjectChangesOperation.cs`](https://github.com/microsoft/sqltoolsservice/blob/main/src/Microsoft.SqlTools.SqlCore/SchemaCompare/SchemaComparePublishProjectChangesOperation.cs). It is one line of real work — keep our facade nearly as thin.

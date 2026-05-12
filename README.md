@@ -2,7 +2,7 @@
 
 Pull a SQL Server database's schema **into** a [SQL database project](https://learn.microsoft.com/en-us/sql/tools/sql-database-projects/sql-database-projects) (`.sqlproj`). Modern [`Microsoft.Build.Sql`](https://github.com/microsoft/DacFx/tree/main/src/Microsoft.Build.Sql) SDK-style projects are the first-class target; legacy SSDT `.sqlproj` files are supported on a best-effort basis.
 
- All schema-compare and project-publish operations go through the public DacFx APIs ([`SchemaCompareProjectEndpoint`](https://learn.microsoft.com/en-us/dotnet/api/microsoft.sqlserver.dac.compare.schemacompareprojectendpoint) and [`SchemaComparisonResult.PublishChangesToProject`](https://learn.microsoft.com/en-us/dotnet/api/microsoft.sqlserver.dac.compare.schemacomparisonresult.publishchangestoproject)), so the tool needs no Visual Studio, vswhere, MSBuild discovery, or hand-rolled folder-structure tables.
+All schema-compare and project-publish operations go through the public DacFx APIs ([`SchemaCompareProjectEndpoint`](https://learn.microsoft.com/en-us/dotnet/api/microsoft.sqlserver.dac.compare.schemacompareprojectendpoint) and [`SchemaComparisonResult.PublishChangesToProject`](https://learn.microsoft.com/en-us/dotnet/api/microsoft.sqlserver.dac.compare.schemacomparisonresult.publishchangestoproject)), so the tool needs no Visual Studio, vswhere, MSBuild discovery, or hand-rolled folder-structure tables.
 
 ## Install
 
