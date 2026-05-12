@@ -39,7 +39,7 @@ SqlProjectSync/
 └── tests/
     ├── Directory.Build.props                 # suppresses CA1707 (xUnit underscore names) for test projects
     ├── SqlProjectSync.Tests/                 # unit tests (xUnit v3, MTP runner)
-    ├── SqlProjectSync.IntegrationTests/      # LocalDB-backed
+    ├── SqlProjectSync.IntegrationTests/      # SQL Server 2022 via Testcontainers (Docker)
     └── Fixtures/
         ├── SdkStyleTestProject/              # Microsoft.Build.Sql SDK fixture (Phase 4)
         └── LegacyTestProject/                # legacy .sqlproj fixture, best-effort (Phase 4)
@@ -72,7 +72,7 @@ Test-runner choice: xUnit v3 over the **Microsoft Testing Platform** (MTP), not 
 | `Microsoft.Extensions.Configuration` | `10.0.7` | Test config. |
 | `Microsoft.Extensions.Configuration.Json` | `10.0.7` | `appsettings.json`. |
 | `Microsoft.Extensions.Configuration.EnvironmentVariables` | `10.0.7` | env-var override. |
-| `Microsoft.Data.SqlClient` | `7.0.1` | LocalDB connections in integration tests. |
+| `Microsoft.Data.SqlClient` | `7.0.1` | SQL Server client used by integration tests. |
 | `xunit.v3` | `3.2.2` | GA. Brings the MTP test host transitively. |
 | `Shouldly` | `4.3.0` | Replaces FluentAssertions (FA 8.x is commercial-licensed). |
 | `coverlet.collector` | `10.0.0` | Coverage. |
@@ -173,21 +173,16 @@ xUnit v3 + Shouldly. Re-establish the legacy guarantees with **freshly written**
   - `Detect_MalformedProject_Throws`
 - `SyncOptionsTests` — defaults sanity.
 
-**Integration tests** (`tests/SqlProjectSync.IntegrationTests`, LocalDB-required):
+**Integration tests** (`tests/SqlProjectSync.IntegrationTests`, Docker required):
 
-- `LocalDbFixture` — `IAsyncLifetime`. Builds the SDK fixture once per session via `dotnet build`, publishes the resulting `.dacpac` to a uniquely-named LocalDB database, drops the DB on dispose. Cleanly written, not derived from the legacy `DatabaseManager`.
-- `SyncIntegrationTests` (`IClassFixture<LocalDbFixture>`):
-  - `Compare_NoDifferences_WhenDbMatchesProject` (≡ legacy `CompareShouldNotFindDifferences`)
+- `SqlContainerFixture` — `IAsyncLifetime`. Spins up a SQL Server 2022 container via `Testcontainers.MsSql`, builds the SDK fixture `.dacpac` once per session via `dotnet build`, and exposes a per-test connection-string builder. Disposes the container at end of session. Tests skip gracefully when Docker is not reachable.
+- `SyncIntegrationTests` (`IClassFixture<SqlContainerFixture>`):
+  - `Compare_NoFileLevelChanges_WhenDbMatchesProject` (≡ legacy `CompareShouldNotFindDifferences`)
   - `Apply_RemovesSqlFile_WhenTableDroppedInDb` (≡ legacy `UpdateShouldRemoveDroppedTable`)
   - `Apply_AddsSqlFile_WhenTableAddedInDb` (≡ legacy `UpdateShouldAddCreatedTable`)
   - **New** `Apply_ModifiesSqlFile_WhenColumnAdded`
   - **New** `Apply_Preview_DoesNotTouchDisk`
-- `LegacyCompatTests` — same scenarios pointed at the legacy fixture. Trait `Style=Legacy`, gated on `SQLPROJECTSYNC_RUN_LEGACY=1`. Acceptable to fail; CI does not block on these.
-
-**Test config**:
-
-- `appsettings.json` with `ConnectionString=Server=(localdb)\MSSQLLocalDB;Integrated Security=true;Encrypt=false;TrustServerCertificate=true`.
-- Loaded via `Microsoft.Extensions.Configuration` + env-var override (`SQLPROJECTSYNC_CONNECTION`).
+- `LegacyCompatTests` — same scenarios pointed at the legacy fixture, also via `SqlContainerFixture`. Trait `Style=Legacy`; CI filters them out of the SDK lane and runs them in `legacy-compat.yml` with `continue-on-error: true`.
 
 Commits:
 
@@ -202,22 +197,22 @@ Commits:
 - DacFx's own `PublishChangesToProject` still does not patch legacy `<Build>` items (confirmed via the DacFx public surface, sqltoolsservice reference, and DacFx repo — no missed overload). The closing piece lives in [LegacyProjectPatcher.cs](src/SqlProjectSync/LegacyProjectPatcher.cs): after each apply, if the target project is legacy-style, it opens the project via the preview `Microsoft.SqlServer.DacFx.Projects` package and replays `publish.AddedFiles` / `publish.DeletedFiles` onto `project.SqlObjectScripts`. SDK projects are detected and skipped (auto-glob covers them).
 - `Microsoft.SqlServer.DacFx.Projects` is pinned to `0.5.22-preview` (the most recent 0.5.x preview, which depends on stable `Microsoft.SqlServer.DacFx 170.2.70`). This lets us keep the core library on stable DacFx `170.3.93`. The 0.6.x line is available but bumps the DacFx dependency to a preview (`170.4.63-preview`); revisit when 0.6.x's API additions are needed or when DacFx 170.4 ships stable.
 - Folder management is not yet wired: if DacFx writes a `.sql` into a directory the legacy `.sqlproj` doesn't already list under `<Folder Include="..."/>`, the file builds (it's covered by the new `<Build>` item) but the folder is not added to the project XML. Our fixtures don't hit that case. If a real consumer does, extend `LegacyProjectPatcher` to also touch `project.Folders.Add` / `Delete` for newly-required schema-type directories.
-- Fixture DSP is `Sql150` (SQL Server 2019) for LocalDB compatibility on the development machine. The Sql150 dacpac deploys cleanly onto SQL Server 2022 too (forward compat), which is what the `SyncIntegrationTests_Sql2022` class verifies via a Testcontainers fixture (`SqlContainerFixture`).
-- Integration tests are split by backend: `[Trait("Backend", "LocalDb")]` on `SyncIntegrationTests` (uses `LocalDbFixture`) and `[Trait("Backend", "Sql2022Container")]` on `SyncIntegrationTests_Sql2022` (uses `SqlContainerFixture`, requires Docker). Tests skip gracefully when their backend is unreachable. CI runs both: `windows-latest` for LocalDB and `ubuntu-latest` for the SQL Server 2022 container.
+- Fixture DSP is `Sql150` (SQL Server 2019). The Sql150 dacpac deploys cleanly onto the SQL Server 2022 container used by the integration tests (forward compat).
+- Integration tests target a single backend (`SqlContainerFixture`, SQL Server 2022 via Testcontainers, requires Docker). Tests skip gracefully when Docker is unreachable. CI runs them on `ubuntu-latest`.
 - The integration tests warm up cold (~10s per test due to per-test DB create + dacpac publish). Acceptable for now; if the suite grows, consider an `IClassFixture` that owns one DB per scenario class and uses `BEGIN/ROLLBACK TRAN` or schema-level resets between tests.
 
 ### Phase 6 — CI (GitHub Actions) (done)
 
-- `.github/workflows/ci.yml` — PR + push to `main`; `windows-latest` (LocalDB); `actions/setup-dotnet@v4` with `dotnet-version: 10.0.x`; `dotnet build -c Release` + `dotnet test --filter "Style!=Legacy"`.
+- `.github/workflows/ci.yml` — PR + push to `main`; `ubuntu-latest` (SQL Server 2022 via Testcontainers); `actions/setup-dotnet@v4` with `dotnet-version: 10.0.x`; `dotnet build -c Release` + `dotnet test -- --filter-not-trait Style=Legacy`.
 - `.github/workflows/release.yml` — tag `v*`; `dotnet pack` both packable projects to `artifacts/`; push to NuGet.org gated on `secrets.NUGET_API_KEY`.
-- `.github/workflows/legacy-compat.yml` — `workflow_dispatch` + nightly cron; `--filter "Style=Legacy"` with `continue-on-error: true`.
+- `.github/workflows/legacy-compat.yml` — `workflow_dispatch` + nightly cron; `dotnet test -- --filter-trait Style=Legacy` with `continue-on-error: true`.
 
 Commit: `ci: github actions for build, test, release, and nightly legacy compat`
 
 **Follow-on items**:
 
 - `release.yml` packs and pushes to NuGet.org gated on the `NUGET_API_KEY` secret. Set that secret in the repository settings before tagging a release, otherwise the push step silently no-ops (the artifacts are still uploaded to the workflow run).
-- `release.yml` runs on `ubuntu-latest` because `dotnet pack` does not need LocalDB. If a future release step needs to run integration tests against the .dacpac as a smoke check, split into a windows job that runs tests and an ubuntu job that packs/publishes.
+- `release.yml` runs on `ubuntu-latest` because `dotnet pack` does not need a SQL Server. If a future release step needs to run integration tests against the .dacpac as a smoke check, the same `ubuntu-latest` runner can host the Testcontainers SQL Server 2022 container that the test suite already uses.
 - The cron in `legacy-compat.yml` is 03:30 UTC daily; adjust to match maintainer timezone preferences.
 - The CI workflow caches packages by `Directory.Packages.props` hash. If we add a `global.json` pinning the SDK or a `nuget.config` with internal feeds, extend the cache key accordingly.
 
@@ -242,9 +237,9 @@ End-to-end checks after each phase lands:
 2. `dotnet pack -c Release` produces `SqlProjectSync.<ver>.nupkg` and `SqlProjectSync.Tool.<ver>.nupkg` in `artifacts/`.
 3. `dotnet tool install --global --add-source ./artifacts SqlProjectSync.Tool` then `sqlproj-sync --help` prints the `sync` verb.
 4. `dotnet test tests/SqlProjectSync.Tests` — all pass.
-5. `dotnet test tests/SqlProjectSync.IntegrationTests --filter "Style!=Legacy"` — all pass against LocalDB.
-6. `SQLPROJECTSYNC_RUN_LEGACY=1 dotnet test tests/SqlProjectSync.IntegrationTests --filter "Style=Legacy"` — record pass/fail per scenario.
-7. CLI smoke against the SDK fixture LocalDB: `sqlproj-sync sync tests/Fixtures/SdkStyleTestProject/CompareToProject.scmp --preview -v Debug` lists diffs without modifying disk; the same command without `--preview` writes the expected files; re-running reports zero differences.
+5. `dotnet test tests/SqlProjectSync.IntegrationTests -- --filter-not-trait Style=Legacy` — all pass against the SQL Server 2022 container (Docker required).
+6. `dotnet test tests/SqlProjectSync.IntegrationTests -- --filter-trait Style=Legacy` — record pass/fail per scenario.
+7. CLI smoke against the SDK fixture: point its `.scmp` `<ConnectionString>` at a SQL Server you control, then run `sqlproj-sync sync tests/Fixtures/SdkStyleTestProject/CompareToProject.scmp --preview -v Debug` to list diffs without modifying disk; the same command without `--preview` writes the expected files; re-running reports zero differences.
 8. CI green: push a branch, open a PR, observe `ci.yml` pass. Tag `v0.1.0` and confirm `release.yml` `pack` runs.
 9. `git log --oneline` shows the per-phase conventional commits.
 

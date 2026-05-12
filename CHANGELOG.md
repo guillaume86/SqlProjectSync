@@ -22,22 +22,22 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `--preview`, `-v|--verbosity`, `--folder-structure`).
 - SDK-style and legacy `.sqlproj` test fixtures with seven schema objects each.
 - xUnit v3 + Shouldly test suite: 24 unit tests, 5 SDK integration tests against
-  each of two backends (LocalDB on Windows and a SQL Server 2022 Testcontainers
-  fixture on Linux) for a total of 10 backend-isolated scenarios, plus a gated
-  3-test legacy-compat suite.
-- `IDatabaseFixture` abstraction with `LocalDbFixture` and `SqlContainerFixture`
-  implementations; integration tests inherit from `SyncIntegrationTestsBase` and
-  bind a backend via `IClassFixture<T>`.
-- GitHub Actions: `ci.yml` (build + tests on Windows), `release.yml` (pack + NuGet
-  push on tag), `legacy-compat.yml` (nightly best-effort legacy run).
+  a SQL Server 2022 Testcontainers fixture, plus a 3-test legacy-compat suite.
+- `IDatabaseFixture` abstraction with a `SqlContainerFixture` implementation;
+  integration tests inherit from `SyncIntegrationTestsBase` and bind the fixture
+  via `IClassFixture<SqlContainerFixture>`.
+- GitHub Actions: `ci.yml` (build + tests on Linux against the SQL Server 2022
+  container), `release.yml` (pack + NuGet push on tag), `legacy-compat.yml`
+  (nightly best-effort legacy run, also on Linux).
 
 ### Notes
 
 - Compare options/exclusions from the `.scmp` are loaded via DacFx's public
   `new SchemaComparison(scmpPath)` constructor; a reflection-based fallback ships
   but has never triggered in our test runs.
-- The fixture DSP is `Sql150` (SQL Server 2019) for LocalDB compatibility. Adjust
-  if your environment uses a newer LocalDB.
+- The fixture DSP is `Sql150` (SQL Server 2019). The Sql150 dacpac deploys
+  cleanly onto the SQL Server 2022 container the integration tests use (forward
+  compat).
 - Legacy `.sqlproj` `<Build Include="..."/>` items are kept in sync with on-disk
   files via the `Microsoft.SqlServer.DacFx.Projects 0.5.22-preview` package
   ([LegacyProjectPatcher](src/SqlProjectSync/LegacyProjectPatcher.cs)) — DacFx's

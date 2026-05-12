@@ -4,8 +4,8 @@ namespace SqlProjectSync.IntegrationTests;
 
 /// <summary>
 /// Per-test isolation: copies the requested fixture into a fresh temp directory and
-/// creates a uniquely-named database on the shared LocalDB server with the fixture
-/// schema already published. Disposing drops the DB and deletes the temp dir.
+/// creates a uniquely-named database on the shared server with the fixture schema
+/// already published. Disposing drops the DB and deletes the temp dir.
 /// </summary>
 internal sealed class SyncTestContext : IAsyncDisposable
 {

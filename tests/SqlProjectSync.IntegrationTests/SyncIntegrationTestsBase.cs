@@ -6,7 +6,7 @@ namespace SqlProjectSync.IntegrationTests;
 /// <summary>
 /// Scenarios that exercise <see cref="SchemaSync.Compare"/> and <see cref="SchemaSync.Apply"/>
 /// against a real SQL Server. Concrete subclasses bind an <see cref="IDatabaseFixture"/>
-/// (LocalDB, SQL Server 2022 container, etc.) via <see cref="IClassFixture{T}"/>.
+/// implementation via <see cref="IClassFixture{T}"/>.
 /// </summary>
 public abstract class SyncIntegrationTestsBase
 {

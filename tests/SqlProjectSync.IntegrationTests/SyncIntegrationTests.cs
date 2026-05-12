@@ -2,11 +2,14 @@ using Xunit;
 
 namespace SqlProjectSync.IntegrationTests;
 
+/// <summary>
+/// Sync scenarios pointed at a SQL Server 2022 container provisioned via Testcontainers.
+/// Skips gracefully when Docker is not reachable. See <see cref="SqlContainerFixture"/>.
+/// </summary>
 [Trait("Style", "Sdk")]
-[Trait("Backend", "LocalDb")]
-public sealed class SyncIntegrationTests : SyncIntegrationTestsBase, IClassFixture<LocalDbFixture>
+public sealed class SyncIntegrationTests : SyncIntegrationTestsBase, IClassFixture<SqlContainerFixture>
 {
-    public SyncIntegrationTests(LocalDbFixture fixture)
+    public SyncIntegrationTests(SqlContainerFixture fixture)
         : base(fixture)
     {
     }

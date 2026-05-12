@@ -14,11 +14,11 @@ namespace SqlProjectSync.IntegrationTests;
 /// mutate the legacy <c>.sqlproj</c> XML. See <c>PLAN.md</c> Phase 5 follow-on notes.
 /// </summary>
 [Trait("Style", "Legacy")]
-public class LegacyCompatTests : IClassFixture<LocalDbFixture>
+public class LegacyCompatTests : IClassFixture<SqlContainerFixture>
 {
-    private readonly LocalDbFixture _fixture;
+    private readonly SqlContainerFixture _fixture;
 
-    public LegacyCompatTests(LocalDbFixture fixture)
+    public LegacyCompatTests(SqlContainerFixture fixture)
     {
         _fixture = fixture;
     }
@@ -26,7 +26,7 @@ public class LegacyCompatTests : IClassFixture<LocalDbFixture>
     [Fact]
     public async Task Compare_NoFileLevelChanges_WhenDbMatchesProject()
     {
-        SkipIfLocalDbUnavailable();
+        SkipIfBackendUnavailable();
 
         await using var ctx = await SyncTestContext.CreateAsync(_fixture, RepoLayout.LegacyFixtureDirectory);
 
@@ -45,7 +45,7 @@ public class LegacyCompatTests : IClassFixture<LocalDbFixture>
     [Fact]
     public async Task Apply_RemovesSqlFile_AndBuildItem_WhenTableDroppedInDb()
     {
-        SkipIfLocalDbUnavailable();
+        SkipIfBackendUnavailable();
 
         await using var ctx = await SyncTestContext.CreateAsync(_fixture, RepoLayout.LegacyFixtureDirectory);
         BuildItemsOf(ctx.ProjectPath).ShouldContain("dbo\\Tables\\Table2.sql");
@@ -65,7 +65,7 @@ public class LegacyCompatTests : IClassFixture<LocalDbFixture>
     [Fact]
     public async Task Apply_AddsSqlFile_AndBuildItem_WhenTableAddedInDb()
     {
-        SkipIfLocalDbUnavailable();
+        SkipIfBackendUnavailable();
 
         await using var ctx = await SyncTestContext.CreateAsync(_fixture, RepoLayout.LegacyFixtureDirectory);
         BuildItemsOf(ctx.ProjectPath).ShouldNotContain("dbo\\Tables\\Table3.sql");
@@ -99,11 +99,11 @@ public class LegacyCompatTests : IClassFixture<LocalDbFixture>
             .ToList();
     }
 
-    private void SkipIfLocalDbUnavailable()
+    private void SkipIfBackendUnavailable()
     {
         if (!_fixture.IsAvailable)
         {
-            Assert.Skip(_fixture.UnavailabilityReason ?? "LocalDB not available.");
+            Assert.Skip(_fixture.UnavailabilityReason ?? "Database backend not available.");
         }
     }
 }

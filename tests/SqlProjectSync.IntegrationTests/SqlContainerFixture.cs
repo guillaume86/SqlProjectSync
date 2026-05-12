@@ -6,8 +6,8 @@ namespace SqlProjectSync.IntegrationTests;
 
 /// <summary>
 /// Spins up a SQL Server 2022 container via Testcontainers for the duration of the test
-/// run. Skips gracefully when Docker is not reachable. Builds the SDK .dacpac the same
-/// way <see cref="LocalDbFixture"/> does.
+/// run. Skips gracefully when Docker is not reachable. Builds the SDK .dacpac once per
+/// session via <see cref="SqlServerHelpers.BuildSdkFixtureDacpac"/>.
 /// </summary>
 public sealed class SqlContainerFixture : IAsyncLifetime, IDatabaseFixture
 {

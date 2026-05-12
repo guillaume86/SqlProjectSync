@@ -19,7 +19,7 @@ src/
 └── SqlProjectSync.Tool/        # CLI global tool, packable as `SqlProjectSync.Tool`
 tests/
 ├── SqlProjectSync.Tests/                  # xUnit v3 unit tests
-├── SqlProjectSync.IntegrationTests/       # xUnit v3 LocalDB-backed tests
+├── SqlProjectSync.IntegrationTests/       # xUnit v3, SQL Server 2022 via Testcontainers (Docker required)
 └── Fixtures/
     ├── SdkStyleTestProject/               # Microsoft.Build.Sql 2.x SDK fixture (primary)
     └── LegacyTestProject/                 # legacy .sqlproj fixture (best-effort)
@@ -42,8 +42,8 @@ See [PLAN.md](./PLAN.md) for the phased implementation.
 ### Test stack
 - **xUnit v3** (`xunit.v3` 3.x — GA). Not xUnit v2. Not NUnit. Not MSTest.
 - **Shouldly** for assertions. **Do not introduce FluentAssertions** — version 8.x and above is commercial-licensed.
-- LocalDB connections via `Microsoft.Data.SqlClient` (not the legacy `System.Data.SqlClient`).
-- Test config via `Microsoft.Extensions.Configuration` + env-var override (`SQLPROJECTSYNC_*`). No bespoke `AppSettings` helper class.
+- Integration tests target SQL Server 2022 in a container via `Testcontainers.MsSql`. Docker is required to run them; they skip gracefully when Docker is not reachable. No LocalDB.
+- SQL client access uses `Microsoft.Data.SqlClient` (not the legacy `System.Data.SqlClient`).
 
 ### CLI
 - **System.CommandLine** 2.0+ (stable GA since April 2026). Not CommandLineParser. Not Cocona.
@@ -81,11 +81,11 @@ See [PLAN.md](./PLAN.md) for the phased implementation.
 
 ## How to add a sync scenario test
 
-1. Add a method to `SyncIntegrationTests` (or a peer class) that takes `LocalDbFixture` via `IClassFixture<LocalDbFixture>`.
-2. Mutate the LocalDB schema with raw SQL via `Microsoft.Data.SqlClient` to set up the scenario (drop a table, add a column, etc.).
+1. Add a method to `SyncIntegrationTests` (or a peer class) that takes `SqlContainerFixture` via `IClassFixture<SqlContainerFixture>`. `SyncTestContext.CreateAsync(fixture, ...)` already gives each test its own freshly-published database on the shared container.
+2. Mutate the database schema with raw SQL via `Microsoft.Data.SqlClient` to set up the scenario (drop a table, add a column, etc.).
 3. Call `SchemaSync.Compare(scmpPath)` / `SchemaSync.Apply(result)`.
 4. Assert on `PublishResult.AddedFiles` / `DeletedFiles` / `ChangedFiles` and the on-disk state of the fixture project directory.
-5. After the test, revert the schema mutation in a `try/finally` or via `LocalDbFixture` reset hooks so subsequent tests start clean.
+5. Disposing the `SyncTestContext` drops the per-test database, so subsequent tests start clean — no manual revert needed.
 
 ## How to run
 
@@ -93,15 +93,14 @@ See [PLAN.md](./PLAN.md) for the phased implementation.
 # Unit tests (no DB needed)
 dotnet test tests/SqlProjectSync.Tests
 
-# SDK integration tests (requires LocalDB on Windows)
-dotnet test tests/SqlProjectSync.IntegrationTests --filter "Style!=Legacy"
+# SDK integration tests (requires Docker — SQL Server 2022 container via Testcontainers)
+dotnet test tests/SqlProjectSync.IntegrationTests -- --filter-not-trait Style=Legacy
 
-# Legacy compat tests (best-effort, off by default)
-$env:SQLPROJECTSYNC_RUN_LEGACY = "1"  # PowerShell
-dotnet test tests/SqlProjectSync.IntegrationTests --filter "Style=Legacy"
+# Legacy compat tests (best-effort)
+dotnet test tests/SqlProjectSync.IntegrationTests -- --filter-trait Style=Legacy
 ```
 
-LocalDB connection can be overridden with `SQLPROJECTSYNC_CONNECTION`.
+The integration tests skip gracefully when Docker is not reachable.
 
 ## Where things live
 
@@ -112,7 +111,7 @@ LocalDB connection can be overridden with `SQLPROJECTSYNC_CONNECTION`.
 | SDK vs legacy detector | `src/SqlProjectSync/SqlProjectStyle.cs` |
 | Options record | `src/SqlProjectSync/SyncOptions.cs` |
 | CLI entry | `src/SqlProjectSync.Tool/Program.cs` |
-| LocalDB lifecycle | `tests/SqlProjectSync.IntegrationTests/LocalDbFixture.cs` |
+| SQL Server container lifecycle | `tests/SqlProjectSync.IntegrationTests/SqlContainerFixture.cs` |
 | Sync scenarios | `tests/SqlProjectSync.IntegrationTests/SyncIntegrationTests.cs` |
 | Legacy compat | `tests/SqlProjectSync.IntegrationTests/LegacyCompatTests.cs` |
 | SDK fixture | `tests/Fixtures/SdkStyleTestProject/` |

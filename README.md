@@ -72,12 +72,12 @@ The legacy `.sqlproj` compat suite (in `tests/SqlProjectSync.IntegrationTests/Le
 ```bash
 dotnet build -c Release SqlProjectSync.slnx
 dotnet test  -c Release tests/SqlProjectSync.Tests/SqlProjectSync.Tests.csproj
-dotnet test  -c Release tests/SqlProjectSync.IntegrationTests/SqlProjectSync.IntegrationTests.csproj --filter "Style!=Legacy"
+dotnet test  -c Release tests/SqlProjectSync.IntegrationTests/SqlProjectSync.IntegrationTests.csproj -- --filter-not-trait Style=Legacy
 dotnet pack  -c Release src/SqlProjectSync/SqlProjectSync.csproj -o artifacts
 dotnet pack  -c Release src/SqlProjectSync.Tool/SqlProjectSync.Tool.csproj -o artifacts
 ```
 
-Integration tests require LocalDB (`(localdb)\MSSQLLocalDB`). Override with `SQLPROJECTSYNC_CONNECTION`. Unit tests have no external dependencies.
+Integration tests require Docker (a SQL Server 2022 container is spun up per test session via [Testcontainers](https://dotnet.testcontainers.org/)). Unit tests have no external dependencies.
 
 ## License
 
