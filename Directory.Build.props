@@ -21,4 +21,14 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <!-- MinVer: derive Version/AssemblyVersion/FileVersion from the closest annotated git tag.
+         Tags must be prefixed with 'v' (e.g. v0.1.0). Untagged builds get 0.0.0-alpha.0.<height>+<sha>. -->
+    <MinVerTagPrefix>v</MinVerTagPrefix>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MinVer" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
+  </ItemGroup>
+
 </Project>

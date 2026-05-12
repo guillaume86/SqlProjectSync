@@ -13,6 +13,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # MinVer needs the full commit + tag history to derive the version.
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -27,21 +30,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      - name: Derive version
-        id: version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
-
       - name: Restore
         run: dotnet restore SqlProjectSync.slnx
 
       - name: Build
-        run: dotnet build -c Release SqlProjectSync.slnx --no-restore -p:Version=${{ steps.version.outputs.version }}
+        run: dotnet build -c Release SqlProjectSync.slnx --no-restore
 
       - name: Pack core library
-        run: dotnet pack -c Release src/SqlProjectSync/SqlProjectSync.csproj --no-build -o artifacts -p:Version=${{ steps.version.outputs.version }}
+        run: dotnet pack -c Release src/SqlProjectSync/SqlProjectSync.csproj --no-build -o artifacts
 
       - name: Pack CLI tool
-        run: dotnet pack -c Release src/SqlProjectSync.Tool/SqlProjectSync.Tool.csproj --no-build -o artifacts -p:Version=${{ steps.version.outputs.version }}
+        run: dotnet pack -c Release src/SqlProjectSync.Tool/SqlProjectSync.Tool.csproj --no-build -o artifacts
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
