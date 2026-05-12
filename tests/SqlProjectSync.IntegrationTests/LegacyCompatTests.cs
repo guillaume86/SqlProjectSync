@@ -1,3 +1,4 @@
+using System.Xml.Linq;
 using Shouldly;
 using Xunit;
 
@@ -44,12 +45,14 @@ public class LegacyCompatTests : IClassFixture<LocalDbFixture>
     }
 
     [Fact]
-    public async Task Apply_RemovesSqlFile_WhenTableDroppedInDb()
+    public async Task Apply_RemovesSqlFile_AndBuildItem_WhenTableDroppedInDb()
     {
         SkipIfLegacyGateClosed();
         SkipIfLocalDbUnavailable();
 
         await using var ctx = await SyncTestContext.CreateAsync(_fixture, RepoLayout.LegacyFixtureDirectory);
+        BuildItemsOf(ctx.ProjectPath).ShouldContain("dbo\\Tables\\Table2.sql");
+
         await ctx.ExecuteSqlAsync("DROP TABLE [dbo].[Table2];");
 
         var comparison = SchemaSync.Compare(ctx.ScmpPath);
@@ -57,15 +60,20 @@ public class LegacyCompatTests : IClassFixture<LocalDbFixture>
 
         publish.Success.ShouldBeTrue();
         publish.DeletedFiles.ShouldContain(f => Path.GetFileName(f).Equals("Table2.sql", StringComparison.OrdinalIgnoreCase));
+
+        File.Exists(Path.Combine(ctx.ProjectDirectory, "dbo", "Tables", "Table2.sql")).ShouldBeFalse();
+        BuildItemsOf(ctx.ProjectPath).ShouldNotContain("dbo\\Tables\\Table2.sql");
     }
 
     [Fact]
-    public async Task Apply_AddsSqlFile_WhenTableAddedInDb()
+    public async Task Apply_AddsSqlFile_AndBuildItem_WhenTableAddedInDb()
     {
         SkipIfLegacyGateClosed();
         SkipIfLocalDbUnavailable();
 
         await using var ctx = await SyncTestContext.CreateAsync(_fixture, RepoLayout.LegacyFixtureDirectory);
+        BuildItemsOf(ctx.ProjectPath).ShouldNotContain("dbo\\Tables\\Table3.sql");
+
         await ctx.ExecuteSqlAsync("""
             CREATE TABLE [dbo].[Table3]
             (
@@ -79,6 +87,20 @@ public class LegacyCompatTests : IClassFixture<LocalDbFixture>
 
         publish.Success.ShouldBeTrue();
         publish.AddedFiles.ShouldContain(f => Path.GetFileName(f).Equals("Table3.sql", StringComparison.OrdinalIgnoreCase));
+
+        Directory.EnumerateFiles(ctx.ProjectDirectory, "Table3.sql", SearchOption.AllDirectories)
+            .ShouldNotBeEmpty();
+        BuildItemsOf(ctx.ProjectPath).ShouldContain(b => b.EndsWith("Table3.sql", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static List<string> BuildItemsOf(string sqlprojPath)
+    {
+        var doc = XDocument.Load(sqlprojPath);
+        return doc.Descendants()
+            .Where(e => string.Equals(e.Name.LocalName, "Build", StringComparison.Ordinal))
+            .Select(e => e.Attribute("Include")?.Value ?? string.Empty)
+            .Where(v => !string.IsNullOrEmpty(v))
+            .ToList();
     }
 
     private static void SkipIfLegacyGateClosed()
