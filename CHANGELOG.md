@@ -6,6 +6,31 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-05-13
+
+### Fixed
+
+- `SchemaSync.Compare` no longer hands every `.sql` file under the project
+  directory to `SchemaCompareProjectEndpoint`. On real-world projects with
+  build outputs under `bin/` / `obj/`, a root `Script.PostDeployment.sql`, or
+  data files under `Version/Data/`, the previous walk made `PublishChangesToProject`
+  fail with `ArgumentNullException: Value cannot be null. (Parameter 'source')`
+  after several minutes of parsing duplicate model objects.
+- New internal `ProjectScriptCollector`:
+  - Legacy `.sqlproj`: parses `<Build Include="…"/>` items only; missing-on-disk
+    items emit a warning and are dropped.
+  - SDK `.sqlproj`: globs `**/*.sql` minus `bin/`, `obj/`, `<Build Remove>`,
+    and non-Build items (`<None>`, `<Content>`, `<PreDeploy>`, `<PostDeploy>`,
+    `<NotInBuild>`, `<RefactorLog>`).
+
+### Added
+
+- Step-by-step logging that mirrors the legacy library's output: running
+  comparison → resolved target (DSP + script count) → comparison complete with
+  diff count → per-difference at Debug → updating project → per-file
+  Add/Remove/Change → save complete. All emitted via `[LoggerMessage]` source
+  generators.
+
 ## [0.2.0] — 2026-05-12
 
 ### Added
