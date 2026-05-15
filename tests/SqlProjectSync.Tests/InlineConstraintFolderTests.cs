@@ -488,6 +488,61 @@ public class InlineConstraintFolderTests
     }
 
     [Fact]
+    public void Lift_Many_Standalone_Alters_Does_Not_Strand_Blank_Lines_Before_Trigger()
+    {
+        using var dir = new TempDirectory();
+        // Each ALTER was separated from the previous one by a single blank
+        // line — that's the Mpleo / legacy schema-compare convention. After
+        // the lift removes all the ALTERs, those gaps must not stay behind
+        // as 5 stranded blank lines before the trigger comment.
+        var path = dir.Write(
+            "dbo/Tables/Demo.sql",
+            "CREATE TABLE [dbo].[Demo] (\n"
+                + "    [Id] INT NOT NULL,\n"
+                + "    [Ref1] INT NULL,\n"
+                + "    [Ref2] INT NULL,\n"
+                + "    [Ref3] INT NULL\n"
+                + ");\n"
+                + "GO\n"
+                + "\n"
+                + "ALTER TABLE [dbo].[Demo]\n"
+                + "    ADD CONSTRAINT [PK_Demo] PRIMARY KEY CLUSTERED ([Id] ASC);\n"
+                + "GO\n"
+                + "\n"
+                + "ALTER TABLE [dbo].[Demo]\n"
+                + "    ADD CONSTRAINT [FK_Demo_R1] FOREIGN KEY ([Ref1]) REFERENCES [dbo].[X] ([Id]);\n"
+                + "GO\n"
+                + "\n"
+                + "ALTER TABLE [dbo].[Demo]\n"
+                + "    ADD CONSTRAINT [FK_Demo_R2] FOREIGN KEY ([Ref2]) REFERENCES [dbo].[X] ([Id]);\n"
+                + "GO\n"
+                + "\n"
+                + "ALTER TABLE [dbo].[Demo]\n"
+                + "    ADD CONSTRAINT [FK_Demo_R3] FOREIGN KEY ([Ref3]) REFERENCES [dbo].[X] ([Id]);\n"
+                + "GO\n"
+                + "\n"
+                + "-- =============================================\n"
+                + "-- Trigger header\n"
+                + "-- =============================================\n"
+                + "CREATE TRIGGER [dbo].[Tr_Demo_AfterInsert]\n"
+                + "    ON [dbo].[Demo]\n"
+                + "    AFTER INSERT\n"
+                + "AS\n"
+                + "BEGIN\n"
+                + "    SET NOCOUNT ON;\n"
+                + "END\n"
+                + "GO\n");
+
+        InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.ModelFidelity, NullLogger.Instance);
+
+        var after = File.ReadAllText(path);
+        // At most one blank line between any two sections — DacFx/lift should
+        // not pile orphaned separators on top of each other.
+        after.ShouldNotContain("\n\n\n", customMessage:
+            "Lift left stranded blank lines between the table and the trigger.");
+    }
+
+    [Fact]
     public void Lift_Does_Not_Introduce_Trailing_Blank_Lines()
     {
         using var dir = new TempDirectory();

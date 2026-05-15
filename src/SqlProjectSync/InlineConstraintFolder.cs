@@ -451,10 +451,18 @@ internal static partial class InlineConstraintFolder
 
     /// <summary>
     /// Computes a removal span covering the batch text + the trailing
-    /// <c>GO</c> + line terminators that follow it. Falls back to the batch's
-    /// own fragment span when no trailing <c>GO</c> can be located. Never
-    /// reaches back before the batch — keeps consecutive removals from
-    /// overlapping each other's leading whitespace.
+    /// <c>GO</c> + every subsequent whitespace-only line up to the next
+    /// non-blank content. Falls back to the batch's own fragment span when
+    /// no trailing <c>GO</c> can be located. Never reaches back before the
+    /// batch — that would risk overlapping a previous batch's removal span.
+    ///
+    /// Eating the trailing blank lines is what keeps a row of removed
+    /// <c>ALTER TABLE ADD CONSTRAINT</c> batches from leaving 20+ stranded
+    /// blank lines between the <c>CREATE TABLE</c> and the next kept batch.
+    /// The single blank line that was originally between the kept
+    /// <c>CREATE TABLE</c> and the first removed <c>ALTER</c> survives
+    /// (it's before the first removal span) — which matches the section-
+    /// separator convention.
     /// </summary>
     private static (int Start, int Length) ComputeRemovalSpan(string text, TSqlBatch batch)
     {
@@ -479,6 +487,36 @@ internal static partial class InlineConstraintFolder
                 end++;
             }
             if (end < text.Length && text[end] == '\n')
+            {
+                end++;
+            }
+        }
+
+        // Consume any following whitespace-only lines. Stops at the first
+        // line with non-whitespace content (the next non-removed batch's
+        // start, or a comment that precedes it).
+        while (end < text.Length)
+        {
+            var eol = text.IndexOfAny(['\r', '\n'], end);
+            if (eol < 0)
+            {
+                break;
+            }
+            var lineBlank = true;
+            for (var j = end; j < eol; j++)
+            {
+                if (!char.IsWhiteSpace(text[j]))
+                {
+                    lineBlank = false;
+                    break;
+                }
+            }
+            if (!lineBlank)
+            {
+                break;
+            }
+            end = eol + 1;
+            if (text[eol] == '\r' && end < text.Length && text[end] == '\n')
             {
                 end++;
             }
