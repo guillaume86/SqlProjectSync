@@ -96,7 +96,11 @@ internal static partial class InlineConstraintFolder
         }
 
         // Collect edits: ALTER removals + CREATE TABLE replacements for any
-        // table that received a lift.
+        // table that received a lift. Sql160ScriptGenerator hard-codes CRLF
+        // for its output; detect the source file's line ending so the
+        // regenerated block doesn't drag mixed line endings into a file
+        // that was previously consistent.
+        var lineEnding = DetectLineEnding(originalText);
         var edits = new List<(int Start, int Length, string Replacement)>();
         foreach (var (start, length, _, _) in batchActions)
         {
@@ -109,7 +113,7 @@ internal static partial class InlineConstraintFolder
                 continue;
             }
             SortTableConstraints(ctx.Statement);
-            var regen = RegenerateCreateTable(ctx.Statement);
+            var regen = RegenerateCreateTable(ctx.Statement, lineEnding);
             edits.Add((ctx.Statement.StartOffset, ctx.Statement.FragmentLength, regen));
         }
 
@@ -393,7 +397,7 @@ internal static partial class InlineConstraintFolder
         }
     }
 
-    private static string RegenerateCreateTable(CreateTableStatement create)
+    private static string RegenerateCreateTable(CreateTableStatement create, string lineEnding)
     {
         var options = new SqlScriptGeneratorOptions
         {
@@ -408,6 +412,17 @@ internal static partial class InlineConstraintFolder
         };
         var generator = new Sql160ScriptGenerator(options);
         generator.GenerateScript(create, out var text);
+
+        // Normalize to LF first, then re-apply the source file's convention.
+        // Sql160ScriptGenerator hard-codes CRLF regardless of the input file's
+        // line endings, which would otherwise leave mixed CRLF (regen) + LF
+        // (surrounding original text) in the output file.
+        text = text.Replace("\r\n", "\n");
+        if (lineEnding == "\r\n")
+        {
+            text = text.Replace("\n", "\r\n");
+        }
+
         // Sql160ScriptGenerator omits the trailing semicolon for CREATE TABLE
         // even with IncludeSemicolons = true. The Mpleo convention (and
         // DacFx's own emit) is `);` — append it so we don't drop the
@@ -417,6 +432,21 @@ internal static partial class InlineConstraintFolder
             text = text.TrimEnd() + ";";
         }
         return text;
+    }
+
+    /// <summary>
+    /// Returns <c>"\r\n"</c> if the first newline in <paramref name="text"/> is
+    /// part of a CRLF pair, otherwise <c>"\n"</c>. Used to keep the regenerated
+    /// <c>CREATE TABLE</c> block consistent with the file's existing convention.
+    /// </summary>
+    private static string DetectLineEnding(string text)
+    {
+        var idx = text.IndexOf('\n');
+        if (idx <= 0)
+        {
+            return "\n";
+        }
+        return text[idx - 1] == '\r' ? "\r\n" : "\n";
     }
 
     /// <summary>

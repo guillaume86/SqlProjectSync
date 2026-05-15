@@ -439,6 +439,76 @@ public class InlineConstraintFolderTests
     }
 
     [Fact]
+    public void Lift_Preserves_Lf_Line_Endings_In_Regenerated_Block()
+    {
+        using var dir = new TempDirectory();
+        var lf = "CREATE TABLE [dbo].[Demo] (\n"
+                 + "    [Id] INT NOT NULL,\n"
+                 + "    [Note] NVARCHAR (50) NULL\n"
+                 + ");\n"
+                 + "GO\n"
+                 + "ALTER TABLE [dbo].[Demo]\n"
+                 + "    ADD CONSTRAINT [PK_Demo] PRIMARY KEY CLUSTERED ([Id] ASC);\n"
+                 + "GO\n";
+        var path = dir.Write("dbo/Tables/Demo.sql", lf);
+
+        InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.ModelFidelity, NullLogger.Instance);
+
+        var after = File.ReadAllText(path);
+        after.ShouldNotContain("\r", customMessage: "Lift introduced CRLF into a file that was LF-only.");
+        after.ShouldContain("CONSTRAINT [PK_Demo] PRIMARY KEY");
+    }
+
+    [Fact]
+    public void Lift_Preserves_Crlf_Line_Endings_In_Regenerated_Block()
+    {
+        using var dir = new TempDirectory();
+        var crlf = "CREATE TABLE [dbo].[Demo] (\r\n"
+                   + "    [Id] INT NOT NULL,\r\n"
+                   + "    [Note] NVARCHAR (50) NULL\r\n"
+                   + ");\r\n"
+                   + "GO\r\n"
+                   + "ALTER TABLE [dbo].[Demo]\r\n"
+                   + "    ADD CONSTRAINT [PK_Demo] PRIMARY KEY CLUSTERED ([Id] ASC);\r\n"
+                   + "GO\r\n";
+        var path = dir.Write("dbo/Tables/Demo.sql", crlf);
+
+        InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.ModelFidelity, NullLogger.Instance);
+
+        var after = File.ReadAllBytes(path);
+        // Every LF must be preceded by CR — no stray lone LFs.
+        for (int i = 0; i < after.Length; i++)
+        {
+            if (after[i] == (byte)'\n')
+            {
+                (i > 0 && after[i - 1] == (byte)'\r').ShouldBeTrue(
+                    customMessage: $"Lone LF at byte {i} in CRLF-encoded file.");
+            }
+        }
+    }
+
+    [Fact]
+    public void Lift_Does_Not_Introduce_Trailing_Blank_Lines()
+    {
+        using var dir = new TempDirectory();
+        var input = "CREATE TABLE [dbo].[Demo] (\n"
+                    + "    [Id] INT NOT NULL,\n"
+                    + "    [Note] NVARCHAR (50) NULL\n"
+                    + ");\n"
+                    + "GO\n"
+                    + "ALTER TABLE [dbo].[Demo]\n"
+                    + "    ADD CONSTRAINT [PK_Demo] PRIMARY KEY CLUSTERED ([Id] ASC);\n"
+                    + "GO\n";
+        var path = dir.Write("dbo/Tables/Demo.sql", input);
+
+        InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.ModelFidelity, NullLogger.Instance);
+
+        var after = File.ReadAllText(path);
+        after.ShouldNotContain("\n\n\n", customMessage: "Three consecutive newlines indicate an extra blank line.");
+        after.ShouldEndWith("GO\n", customMessage: "File should end with GO + single newline, not extra trailing blanks.");
+    }
+
+    [Fact]
     public void Mode_None_Preserves_Standalone_PrimaryKey()
     {
         using var dir = new TempDirectory();
