@@ -155,9 +155,13 @@ internal static partial class ProjectScriptCollector
 
     private static string ResolveToProject(string projectDir, string include)
     {
-        // .sqlproj Include attributes are backslash-separated, but tolerate forward
-        // slashes anyway — MSBuild does, and so will we.
-        var normalised = include.Replace('/', Path.DirectorySeparatorChar);
+        // .sqlproj Include attributes are backslash-separated, but MSBuild
+        // tolerates forward slashes too. Normalise both — on Linux the OS
+        // separator is '/' and Path.Combine treats a stray '\' as a literal
+        // filename character, which breaks File.Exists lookups.
+        var normalised = include
+            .Replace('\\', Path.DirectorySeparatorChar)
+            .Replace('/', Path.DirectorySeparatorChar);
         var full = Path.IsPathRooted(normalised)
             ? normalised
             : Path.Combine(projectDir, normalised);
