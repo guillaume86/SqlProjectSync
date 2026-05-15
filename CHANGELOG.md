@@ -6,6 +6,15 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-05-15
+
+### Changed
+
+- `LogDropped` (per-constraint dedup message) moves from Information to
+  Debug. Same reasoning as `LogLifted` in 0.4.0: on a sync that triggers
+  the workaround across many tables, the per-constraint log fans out and
+  drowns the higher-signal events.
+
 ## [0.4.1] — 2026-05-15
 
 ### Fixed

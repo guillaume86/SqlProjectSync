@@ -575,7 +575,7 @@ internal static partial class InlineConstraintFolder
     private static partial void LogFoldFailed(ILogger logger, string file, string reason);
 
     [LoggerMessage(
-        Level = LogLevel.Information,
+        Level = LogLevel.Debug,
         Message = "Dropped redundant ALTER TABLE ADD CONSTRAINT [{Constraint}] in '{File}' (DacFx #792 workaround).")]
     private static partial void LogDropped(ILogger logger, string file, string constraint);
 
