@@ -6,6 +6,21 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-05-15
+
+### Fixed
+
+- `InlineConstraintFolder` no longer leaves stranded blank lines after a
+  run of removed `ALTER TABLE ADD CONSTRAINT` batches. Each removed batch
+  had a preceding blank-line separator that was not part of its removal
+  span — observed on Mpleo's `AkAsk.sql` where 22 lifted ALTERs left 21
+  blank lines between `CREATE TABLE` and the trailing `CREATE TRIGGER`.
+  `ComputeRemovalSpan` now keeps consuming whitespace-only lines after
+  `GO` until the next non-blank line, so adjacent removed batches collapse
+  to no residue. The single blank line that was originally between the
+  kept `CREATE TABLE` and the first removed `ALTER` survives — matches
+  the section-separator convention.
+
 ## [0.4.0] — 2026-05-15
 
 ### Added
