@@ -31,6 +31,12 @@ var inlineConstraintsOption = new Option<InlineConstraintsMode>("--inline-constr
     DefaultValueFactory = _ => InlineConstraintsMode.None,
 };
 
+var trimLeadingBlanksOption = new Option<bool>("--trim-leading-blanks")
+{
+    Description = "Strip leading whitespace-only lines from every touched .sql file.",
+    DefaultValueFactory = _ => false,
+};
+
 var syncCommand = new Command("sync", "Sync a SQL Server database schema into a .sqlproj.")
 {
     scmpPathArg,
@@ -38,6 +44,7 @@ var syncCommand = new Command("sync", "Sync a SQL Server database schema into a 
     verbosityOption,
     folderStructureOption,
     inlineConstraintsOption,
+    trimLeadingBlanksOption,
 };
 
 syncCommand.SetAction(parseResult =>
@@ -47,6 +54,7 @@ syncCommand.SetAction(parseResult =>
     var verbosity = parseResult.GetValue(verbosityOption);
     var folderStructure = parseResult.GetValue(folderStructureOption);
     var inlineConstraints = parseResult.GetValue(inlineConstraintsOption);
+    var trimLeadingBlanks = parseResult.GetValue(trimLeadingBlanksOption);
 
     using var loggerFactory = LoggerFactory.Create(builder =>
     {
@@ -67,6 +75,7 @@ syncCommand.SetAction(parseResult =>
         {
             FolderStructure = folderStructure,
             InlineConstraintsMode = inlineConstraints,
+            TrimLeadingBlankLines = trimLeadingBlanks,
         };
         var comparison = SchemaSync.Compare(scmpPath, options, logger);
 

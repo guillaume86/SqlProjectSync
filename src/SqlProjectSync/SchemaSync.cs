@@ -56,7 +56,9 @@ public static partial class SchemaSync
             }
         }
 
-        return new SchemaSyncResult(result, projectPath, options.FolderStructure, options.InlineConstraintsMode);
+        return new SchemaSyncResult(
+            result, projectPath, options.FolderStructure,
+            options.InlineConstraintsMode, options.TrimLeadingBlankLines);
     }
 
     /// <summary>Applies a comparison result to the target project on disk, or returns a preview when <paramref name="preview"/> is <c>true</c>.</summary>
@@ -106,6 +108,10 @@ public static partial class SchemaSync
         if (touched.Count > 0)
         {
             InlineConstraintFolder.Fold(touched, comparison.InlineConstraintsMode, logger);
+            if (comparison.TrimLeadingBlankLines)
+            {
+                LeadingBlankTrimmer.Cleanup(touched, logger);
+            }
         }
 
         LegacyProjectPatcher.PatchIfNeeded(comparison.ProjectPath, result, logger);

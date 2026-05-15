@@ -24,4 +24,13 @@ public sealed record SyncOptions
     /// — only the mandatory dedup pass runs.
     /// </summary>
     public InlineConstraintsMode InlineConstraintsMode { get; init; } = InlineConstraintsMode.None;
+
+    /// <summary>
+    /// When <c>true</c>, <see cref="SchemaSync.Apply"/> strips leading
+    /// whitespace-only lines from every touched <c>.sql</c> file. DacFx
+    /// occasionally emits a blank line before the first statement (especially
+    /// before a leading comment that precedes a <c>CREATE TABLE</c>); enabling
+    /// this option produces a quieter first-sync diff. Defaults to <c>false</c>.
+    /// </summary>
+    public bool TrimLeadingBlankLines { get; init; }
 }

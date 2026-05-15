@@ -10,12 +10,14 @@ public sealed class SchemaSyncResult
         SchemaComparisonResult inner,
         string projectPath,
         DacExtractTarget folderStructure,
-        InlineConstraintsMode inlineConstraintsMode)
+        InlineConstraintsMode inlineConstraintsMode,
+        bool trimLeadingBlankLines)
     {
         Inner = inner;
         ProjectPath = projectPath;
         FolderStructure = folderStructure;
         InlineConstraintsMode = inlineConstraintsMode;
+        TrimLeadingBlankLines = trimLeadingBlankLines;
     }
 
     internal SchemaComparisonResult Inner { get; }
@@ -28,6 +30,9 @@ public sealed class SchemaSyncResult
 
     /// <summary>The inline-constraints reshape mode <see cref="SchemaSync.Apply"/> will use.</summary>
     public InlineConstraintsMode InlineConstraintsMode { get; }
+
+    /// <summary>Whether <see cref="SchemaSync.Apply"/> will strip leading blank lines from touched files.</summary>
+    public bool TrimLeadingBlankLines { get; }
 
     /// <summary>Whether the comparison result is valid (free of model errors).</summary>
     public bool IsValid => Inner.IsValid;

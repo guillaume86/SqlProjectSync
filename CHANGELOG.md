@@ -6,6 +6,41 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-05-15
+
+### Added
+
+- `SyncOptions.TrimLeadingBlankLines` (opt-in, default `false`) and matching
+  `--trim-leading-blanks` CLI flag. When enabled, `SchemaSync.Apply` strips
+  leading whitespace-only lines from every touched `.sql` file via the new
+  `LeadingBlankTrimmer`. DacFx occasionally emits a blank line before the
+  first statement (especially before a leading comment that precedes a
+  `CREATE TABLE`); enabling this option keeps the first-sync diff quiet.
+
+### Fixed
+
+- `InlineConstraintFolder` no longer drags CRLF into a previously LF-only
+  file (or vice versa) when rewriting a `CREATE TABLE` under
+  `ModelFidelity`. `Sql160ScriptGenerator` hard-codes CRLF in its output;
+  the folder now sniffs the source file's line ending and normalizes the
+  regen to match.
+- `ProjectScriptCollector` resolves legacy `<Build Include="dbo\Tables\..."/>`
+  paths correctly on non-Windows hosts. The collector previously only
+  swapped `/` for `Path.DirectorySeparatorChar`, so on Linux the unchanged
+  backslashes became literal filename characters and `File.Exists` dropped
+  every legacy build item. Three previously red Linux-CI tests now pass.
+
+### Changed
+
+- `SchemaSync` Information-level logs (running compare, comparison complete,
+  updating project, save complete, per-file add/remove/change) move to
+  Debug. Console output is the caller's responsibility — callers who want
+  a familiar one-line-per-file summary can iterate `PublishResult.AddedFiles`
+  / `ChangedFiles` / `DeletedFiles` themselves.
+- `LogLifted` (per-constraint lift message under `ModelFidelity`) moves to
+  Trace. It can fan out to hundreds of lines on a first sync after a tool
+  swap and is diagnostic noise at Information.
+
 ## [0.3.0] — 2026-05-15
 
 ### Added
