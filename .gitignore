@@ -13,6 +13,9 @@
 *.userosscache
 *.sln.docstates
 
+# C# DevKit / language server caches
+*.lscache
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
