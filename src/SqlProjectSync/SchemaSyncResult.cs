@@ -9,11 +9,13 @@ public sealed class SchemaSyncResult
     internal SchemaSyncResult(
         SchemaComparisonResult inner,
         string projectPath,
-        DacExtractTarget folderStructure)
+        DacExtractTarget folderStructure,
+        InlineConstraintsMode inlineConstraintsMode)
     {
         Inner = inner;
         ProjectPath = projectPath;
         FolderStructure = folderStructure;
+        InlineConstraintsMode = inlineConstraintsMode;
     }
 
     internal SchemaComparisonResult Inner { get; }
@@ -23,6 +25,9 @@ public sealed class SchemaSyncResult
 
     /// <summary>The folder layout DacFx will use when applying changes.</summary>
     public DacExtractTarget FolderStructure { get; }
+
+    /// <summary>The inline-constraints reshape mode <see cref="SchemaSync.Apply"/> will use.</summary>
+    public InlineConstraintsMode InlineConstraintsMode { get; }
 
     /// <summary>Whether the comparison result is valid (free of model errors).</summary>
     public bool IsValid => Inner.IsValid;

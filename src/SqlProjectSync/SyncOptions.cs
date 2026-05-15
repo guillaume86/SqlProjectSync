@@ -16,4 +16,12 @@ public sealed record SyncOptions
 
     /// <summary>Overrides the data schema provider (DSP) string normally read from the target <c>.sqlproj</c>.</summary>
     public string? DataSchemaProvider { get; init; }
+
+    /// <summary>
+    /// Controls whether <see cref="SchemaSync.Apply"/> rewrites trailing
+    /// <c>ALTER TABLE ADD CONSTRAINT</c> statements as inline constraints
+    /// inside <c>CREATE TABLE</c>. Defaults to <see cref="InlineConstraintsMode.None"/>
+    /// — only the mandatory dedup pass runs.
+    /// </summary>
+    public InlineConstraintsMode InlineConstraintsMode { get; init; } = InlineConstraintsMode.None;
 }

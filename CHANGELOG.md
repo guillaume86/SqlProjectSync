@@ -6,6 +6,36 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-15
+
+### Added
+
+- Workaround for [DacFx #792](https://github.com/microsoft/DacFx/issues/792):
+  `SchemaSync.Apply` now post-processes `PublishChangesToProject`'s output to
+  fold trailing `ALTER TABLE ADD CONSTRAINT` statements relative to the
+  matching `CREATE TABLE` in the same file.
+  - **Dedup** (always on): drops every standalone `ALTER` whose constraint
+    name is already declared inline. Required — the duplicate fails model
+    validation on subsequent compares and breaks the round-trip.
+  - **Lift** (opt-in via `SyncOptions.InlineConstraintsMode = ModelFidelity`):
+    also rewrites standalone-only constraints as inline constraints inside
+    `CREATE TABLE`. Useful when migrating an existing project from tooling
+    that emitted inline-form constraints, so first-sync diffs stay small.
+- Public enum `InlineConstraintsMode` (`None`, `ModelFidelity`), name and
+  values mirroring DacFx's internal `CreateTableInlineConstraintsMode`.
+- `--inline-constraints None|ModelFidelity` option on the `sync` CLI verb.
+- Integration tripwire `DacFxIssue792Tests` that bypasses SqlProjectSync,
+  drives DacFx directly with a minimal repro, and asserts the upstream bug
+  is still present. When the assertion starts failing, the workaround should
+  be removed.
+
+### Changed
+
+- Bumped `Microsoft.SqlServer.DacFx` to `170.4.80-preview` and
+  `Microsoft.SqlServer.DacFx.Projects` to `0.6.3-preview`. Both still ship
+  the bug; the bump just keeps us tracking the latest preview while
+  waiting for an upstream fix.
+
 ## [0.2.1] — 2026-05-13
 
 ### Fixed

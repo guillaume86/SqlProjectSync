@@ -25,12 +25,19 @@ var folderStructureOption = new Option<DacExtractTarget>("--folder-structure")
     DefaultValueFactory = _ => DacExtractTarget.SchemaObjectType,
 };
 
+var inlineConstraintsOption = new Option<InlineConstraintsMode>("--inline-constraints")
+{
+    Description = "Reshape standalone ALTER TABLE ADD CONSTRAINT into CREATE TABLE (None|ModelFidelity). Redundant inline duplicates are always dropped regardless.",
+    DefaultValueFactory = _ => InlineConstraintsMode.None,
+};
+
 var syncCommand = new Command("sync", "Sync a SQL Server database schema into a .sqlproj.")
 {
     scmpPathArg,
     previewOption,
     verbosityOption,
     folderStructureOption,
+    inlineConstraintsOption,
 };
 
 syncCommand.SetAction(parseResult =>
@@ -39,6 +46,7 @@ syncCommand.SetAction(parseResult =>
     var preview = parseResult.GetValue(previewOption);
     var verbosity = parseResult.GetValue(verbosityOption);
     var folderStructure = parseResult.GetValue(folderStructureOption);
+    var inlineConstraints = parseResult.GetValue(inlineConstraintsOption);
 
     using var loggerFactory = LoggerFactory.Create(builder =>
     {
@@ -55,7 +63,11 @@ syncCommand.SetAction(parseResult =>
 
     try
     {
-        var options = new SyncOptions { FolderStructure = folderStructure };
+        var options = new SyncOptions
+        {
+            FolderStructure = folderStructure,
+            InlineConstraintsMode = inlineConstraints,
+        };
         var comparison = SchemaSync.Compare(scmpPath, options, logger);
 
         if (!comparison.IsValid)

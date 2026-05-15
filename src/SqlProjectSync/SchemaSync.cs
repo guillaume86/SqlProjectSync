@@ -56,7 +56,7 @@ public static partial class SchemaSync
             }
         }
 
-        return new SchemaSyncResult(result, projectPath, options.FolderStructure);
+        return new SchemaSyncResult(result, projectPath, options.FolderStructure, options.InlineConstraintsMode);
     }
 
     /// <summary>Applies a comparison result to the target project on disk, or returns a preview when <paramref name="preview"/> is <c>true</c>.</summary>
@@ -92,6 +92,21 @@ public static partial class SchemaSync
         }
 
         var result = PublishResult.FromDacFx(publish);
+
+        // Workaround for https://github.com/microsoft/DacFx/issues/792:
+        // PublishChangesToProject emits each constraint as a trailing
+        // ALTER TABLE ADD CONSTRAINT, sometimes in addition to an inline copy
+        // inside CREATE TABLE (the duplicate-definition case that breaks model
+        // validation) and sometimes instead of one (when the source endpoint
+        // is a database, producing standalone-only output). The dedup pass is
+        // mandatory: duplicates fail model validation, so they always go.
+        // Lifting standalones inline is opt-in via SyncOptions.InlineConstraintsMode.
+        var touched = new HashSet<string>(result.AddedFiles, StringComparer.OrdinalIgnoreCase);
+        touched.UnionWith(result.ChangedFiles);
+        if (touched.Count > 0)
+        {
+            InlineConstraintFolder.Fold(touched, comparison.InlineConstraintsMode, logger);
+        }
 
         foreach (var added in result.AddedFiles)
         {
