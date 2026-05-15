@@ -512,7 +512,7 @@ internal static partial class InlineConstraintFolder
     private static partial void LogDropped(ILogger logger, string file, string constraint);
 
     [LoggerMessage(
-        Level = LogLevel.Information,
+        Level = LogLevel.Trace,
         Message = "Lifted ALTER TABLE ADD CONSTRAINT [{Constraint}] into CREATE TABLE in '{File}' (DacFx #792 workaround).")]
     private static partial void LogLifted(ILogger logger, string file, string constraint);
 }
