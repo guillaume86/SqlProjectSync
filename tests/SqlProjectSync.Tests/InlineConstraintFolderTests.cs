@@ -488,6 +488,50 @@ public class InlineConstraintFolderTests
     }
 
     [Fact]
+    public void Trims_Leading_Blank_Lines()
+    {
+        using var dir = new TempDirectory();
+        var path = dir.Write(
+            "dbo/Tables/Demo.sql",
+            "\n\n   \nCREATE TABLE [dbo].[Demo] (\n    [Id] INT NOT NULL,\n    [Note] NVARCHAR (50) CONSTRAINT [DF_Demo_Note] DEFAULT ('hello') NULL,\n    CONSTRAINT [PK_Demo] PRIMARY KEY CLUSTERED ([Id] ASC)\n);\nGO\n");
+
+        InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.None, NullLogger.Instance);
+
+        var after = File.ReadAllText(path);
+        after.ShouldStartWith("CREATE TABLE [dbo].[Demo]");
+    }
+
+    [Fact]
+    public void Trims_Leading_Blank_Lines_Even_Without_Folds()
+    {
+        using var dir = new TempDirectory();
+        // No CREATE TABLE, no ALTER — just a comment with leading blanks.
+        // FoldFile should still strip the blanks and write.
+        var path = dir.Write(
+            "dbo/Views/Demo.sql",
+            "\n\nCREATE VIEW [dbo].[Demo] AS SELECT 1 AS [x];\nGO\n");
+
+        InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.None, NullLogger.Instance);
+
+        var after = File.ReadAllText(path);
+        after.ShouldStartWith("CREATE VIEW");
+    }
+
+    [Fact]
+    public void Trims_Leading_Blank_Lines_With_Crlf_Endings()
+    {
+        using var dir = new TempDirectory();
+        var path = dir.Write(
+            "dbo/Tables/Demo.sql",
+            "\r\n\r\nCREATE TABLE [dbo].[Demo] (\r\n    [Id] INT NOT NULL,\r\n    CONSTRAINT [PK_Demo] PRIMARY KEY CLUSTERED ([Id] ASC)\r\n);\r\nGO\r\n");
+
+        InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.None, NullLogger.Instance);
+
+        var after = File.ReadAllText(path);
+        after.ShouldStartWith("CREATE TABLE [dbo].[Demo]");
+    }
+
+    [Fact]
     public void Lift_Does_Not_Introduce_Trailing_Blank_Lines()
     {
         using var dir = new TempDirectory();

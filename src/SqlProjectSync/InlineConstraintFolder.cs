@@ -72,27 +72,20 @@ internal static partial class InlineConstraintFolder
         }
 
         var tables = CollectCreateTables(script);
-        if (tables.Count == 0)
-        {
-            return 0;
-        }
-
         var batchActions = new List<(int Start, int Length, string ConstraintName, bool Lifted)>();
 
-        foreach (var batch in script.Batches)
+        if (tables.Count > 0)
         {
-            if (!TryFoldBatch(batch, tables, mode, out var firstName, out var anyLift))
+            foreach (var batch in script.Batches)
             {
-                continue;
+                if (!TryFoldBatch(batch, tables, mode, out var firstName, out var anyLift))
+                {
+                    continue;
+                }
+
+                var span = ComputeRemovalSpan(originalText, batch);
+                batchActions.Add((span.Start, span.Length, firstName, anyLift));
             }
-
-            var span = ComputeRemovalSpan(originalText, batch);
-            batchActions.Add((span.Start, span.Length, firstName, anyLift));
-        }
-
-        if (batchActions.Count == 0)
-        {
-            return 0;
         }
 
         // Collect edits: ALTER removals + CREATE TABLE replacements for any
@@ -123,6 +116,12 @@ internal static partial class InlineConstraintFolder
         {
             rewritten = rewritten.Remove(start, length).Insert(start, replacement);
         }
+
+        // Strip leading blank lines — DacFx occasionally emits a blank line
+        // before the first statement, and the fold itself can leave one when
+        // it removes a batch that was preceded only by whitespace. Preserves
+        // the file's line-ending convention and any BOM (out of scope here).
+        rewritten = TrimLeadingBlankLines(rewritten);
 
         if (string.Equals(rewritten, originalText, StringComparison.Ordinal))
         {
@@ -447,6 +446,49 @@ internal static partial class InlineConstraintFolder
             return "\n";
         }
         return text[idx - 1] == '\r' ? "\r\n" : "\n";
+    }
+
+    /// <summary>
+    /// Strips leading lines that contain only whitespace. Stops at the first
+    /// line that has any non-whitespace content. A leading BOM keeps the file
+    /// from looking "blank" on the first line, so this method leaves it in
+    /// place — BOM handling is a separate concern.
+    /// </summary>
+    private static string TrimLeadingBlankLines(string text)
+    {
+        var i = 0;
+        while (i < text.Length)
+        {
+            var nextEol = text.IndexOfAny(['\r', '\n'], i);
+            if (nextEol < 0)
+            {
+                break;
+            }
+
+            var lineIsBlank = true;
+            for (var j = i; j < nextEol; j++)
+            {
+                if (!char.IsWhiteSpace(text[j]))
+                {
+                    lineIsBlank = false;
+                    break;
+                }
+            }
+            if (!lineIsBlank)
+            {
+                break;
+            }
+
+            if (text[nextEol] == '\r' && nextEol + 1 < text.Length && text[nextEol + 1] == '\n')
+            {
+                i = nextEol + 2;
+            }
+            else
+            {
+                i = nextEol + 1;
+            }
+        }
+        return i == 0 ? text : text[i..];
     }
 
     /// <summary>
