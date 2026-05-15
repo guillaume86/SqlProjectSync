@@ -108,43 +108,12 @@ public static partial class SchemaSync
             InlineConstraintFolder.Fold(touched, comparison.InlineConstraintsMode, logger);
         }
 
-        foreach (var added in result.AddedFiles)
-        {
-            var rel = ToProjectRelative(projectDir, added);
-            LogAdded(logger, rel);
-        }
-
-        foreach (var deleted in result.DeletedFiles)
-        {
-            var rel = ToProjectRelative(projectDir, deleted);
-            LogDeleted(logger, rel);
-        }
-
-        foreach (var changed in result.ChangedFiles)
-        {
-            var rel = ToProjectRelative(projectDir, changed);
-            LogChanged(logger, rel);
-        }
-
         LegacyProjectPatcher.PatchIfNeeded(comparison.ProjectPath, result, logger);
         LogSaveComplete(logger);
         return result;
     }
 
-    private static string ToProjectRelative(string projectDir, string filePath)
-    {
-        if (string.IsNullOrWhiteSpace(filePath))
-        {
-            return filePath;
-        }
-
-        var full = Path.IsPathRooted(filePath)
-            ? filePath
-            : Path.Combine(projectDir, filePath);
-        return Path.GetRelativePath(projectDir, full).Replace('/', '\\');
-    }
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "Running schema comparison using \"{ScmpPath}\"...")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Running schema comparison using \"{ScmpPath}\"...")]
     private static partial void LogRunningComparison(ILogger logger, string scmpPath);
 
     [LoggerMessage(
@@ -152,7 +121,7 @@ public static partial class SchemaSync
         Message = "Resolved target project \"{ProjectPath}\" (dsp={Dsp}, {ScriptCount} build script(s)).")]
     private static partial void LogResolvedTarget(ILogger logger, string projectPath, string dsp, int scriptCount);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Schema comparison complete. Found {DifferenceCount} difference(s).")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Schema comparison complete. Found {DifferenceCount} difference(s).")]
     private static partial void LogComparisonComplete(ILogger logger, int differenceCount);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "-> {Action} {Name}")]
@@ -161,18 +130,9 @@ public static partial class SchemaSync
     [LoggerMessage(Level = LogLevel.Debug, Message = "Preview requested; not writing to disk.")]
     private static partial void LogPreview(ILogger logger);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Updating project \"{ProjectPath}\"...")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Updating project \"{ProjectPath}\"...")]
     private static partial void LogUpdatingProject(ILogger logger, string projectPath);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "-> Add \"{Path}\"")]
-    private static partial void LogAdded(ILogger logger, string path);
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "-> Remove \"{Path}\"")]
-    private static partial void LogDeleted(ILogger logger, string path);
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "-> Change \"{Path}\"")]
-    private static partial void LogChanged(ILogger logger, string path);
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "Save complete.")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Save complete.")]
     private static partial void LogSaveComplete(ILogger logger);
 }
