@@ -8,9 +8,9 @@
     <PackageVersion Include="Microsoft.SqlServer.DacFx" Version="170.4.80-preview" />
     <PackageVersion Include="Microsoft.SqlServer.DacFx.Projects" Version="0.6.3-preview" />
     <PackageVersion Include="System.CommandLine" Version="2.0.7" />
-    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.7" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.7" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.7" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.8" />
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.0.1" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
     <PackageVersion Include="Shouldly" Version="4.3.0" />
