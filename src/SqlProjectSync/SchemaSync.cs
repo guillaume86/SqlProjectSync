@@ -86,6 +86,12 @@ public static partial class SchemaSync
 
         LogUpdatingProject(logger, comparison.ProjectPath);
 
+        // Take crash-prone table-Change diffs away from DacFx before publishing.
+        // PublishChangesToProject throws "startIndex ('-1')" when a table's inline
+        // column/constraint children edit the same file before its whole-table
+        // replace runs; ChangedTableRewriter rewrites those files itself.
+        var rewritePlans = ChangedTableRewriter.Plan(comparison.Inner, logger);
+
         var publish = comparison.Inner.PublishChangesToProject(projectDir, comparison.FolderStructure);
         if (!publish.Success)
         {
@@ -93,7 +99,8 @@ public static partial class SchemaSync
                 $"PublishChangesToProject failed for '{comparison.ProjectPath}': {publish.ErrorMessage}");
         }
 
-        var result = PublishResult.FromDacFx(publish);
+        var rewrittenFiles = ChangedTableRewriter.Execute(rewritePlans, logger);
+        var result = PublishResult.FromDacFx(publish).WithAdditionalChangedFiles(rewrittenFiles);
 
         // Workaround for https://github.com/microsoft/DacFx/issues/792:
         // PublishChangesToProject emits each constraint as a trailing

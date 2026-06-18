@@ -106,6 +106,32 @@ public abstract class SyncIntegrationTestsBase
     }
 
     [Fact]
+    public async Task Apply_RenamesColumnWithForeignKey_WithoutCrash()
+    {
+        SkipIfUnavailable();
+
+        await using var ctx = await SyncTestContext.CreateAsync(Fixture, RepoLayout.SdkFixtureDirectory);
+
+        // Table2.Table1Id carries an inline FK to Table1. Renaming it surfaces as a
+        // table-Change whose column delete/add + FK change all live in Table2.sql —
+        // the shape that crashed DacFx's PublishChangesToProject (startIndex -1).
+        await ctx.ExecuteSqlAsync("EXEC sp_rename 'dbo.Table2.Table1Id', 'Table1Ref', 'COLUMN';");
+
+        var comparison = SchemaSync.Compare(ctx.ScmpPath);
+        comparison.Differences.ShouldNotBeEmpty();
+
+        var publish = SchemaSync.Apply(comparison);
+
+        publish.Success.ShouldBeTrue();
+        publish.ChangedFiles.ShouldContain(f => Path.GetFileName(f).Equals("Table2.sql", StringComparison.OrdinalIgnoreCase));
+
+        var table2OnDisk = Path.Combine(ctx.ProjectDirectory, "dbo", "Tables", "Table2.sql");
+        var table2 = File.ReadAllText(table2OnDisk);
+        table2.ShouldContain("[Table1Ref]");
+        table2.ShouldNotContain("[Table1Id]");
+    }
+
+    [Fact]
     public async Task Apply_Preview_DoesNotTouchDisk()
     {
         SkipIfUnavailable();

@@ -6,6 +6,25 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.3] — 2026-06-18
+
+### Fixed
+
+- `SchemaSync.Apply` no longer crashes with
+  `startIndex ('-1') must be a non-negative value` on table changes. DacFx's
+  `PublishChangesToProject` processes a changed table's inline column/constraint
+  children first — rewriting the `.sql` file in place — and then fails to locate
+  the table's original script in the now-modified file, aborting the whole
+  publish with nothing written. Observed on Mpleo for a column rename with a
+  referencing foreign key and for a primary-key column change. The new
+  `ChangedTableRewriter` takes those table diffs over: it excludes them from the
+  DacFx publish and rewrites each file itself, splicing the `CREATE TABLE` by
+  offset with the freshly-scripted source definition while preserving untouched
+  statements (e.g. an unchanged index or trigger in the same file) and applying
+  standalone children (new/dropped indexes) separately.
+  `ChangedTableRewriterTests.RawPublishChangesToProject_StillCrashesOnColumnRename`
+  is the tripwire that flips when DacFx fixes the bug upstream.
+
 ## [0.4.2] — 2026-05-15
 
 ### Changed

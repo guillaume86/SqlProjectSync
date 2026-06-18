@@ -44,6 +44,39 @@ public sealed class PublishResult
     /// <summary>The raw differences emitted by the comparison; populated only when <see cref="IsPreview"/> is <c>true</c>.</summary>
     public IReadOnlyList<SchemaDifference> PreviewDifferences { get; }
 
+    /// <summary>
+    /// Returns a copy with <paramref name="extraChangedFiles"/> merged into
+    /// <see cref="ChangedFiles"/> (de-duplicated, case-insensitive). Used to fold
+    /// in files written by the <see cref="ChangedTableRewriter"/> workaround,
+    /// which bypasses DacFx's publish for crash-prone table changes.
+    /// </summary>
+    internal PublishResult WithAdditionalChangedFiles(IEnumerable<string> extraChangedFiles)
+    {
+        var merged = new List<string>(ChangedFiles);
+        var seen = new HashSet<string>(ChangedFiles, StringComparer.OrdinalIgnoreCase);
+        foreach (var file in extraChangedFiles)
+        {
+            if (seen.Add(file))
+            {
+                merged.Add(file);
+            }
+        }
+
+        if (merged.Count == ChangedFiles.Count)
+        {
+            return this;
+        }
+
+        return new PublishResult(
+            isPreview: IsPreview,
+            success: Success,
+            errorMessage: ErrorMessage,
+            addedFiles: AddedFiles,
+            deletedFiles: DeletedFiles,
+            changedFiles: merged,
+            previewDifferences: PreviewDifferences);
+    }
+
     internal static PublishResult FromDacFx(SchemaComparePublishProjectResult result)
     {
         return new PublishResult(
