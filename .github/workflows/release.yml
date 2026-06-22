@@ -16,7 +16,7 @@ jobs:
       NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # MinVer needs the full commit + tag history to derive the version.
           fetch-depth: 0
