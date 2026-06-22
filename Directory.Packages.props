@@ -7,7 +7,7 @@
   <ItemGroup>
     <PackageVersion Include="Microsoft.SqlServer.DacFx" Version="170.4.80-preview" />
     <PackageVersion Include="Microsoft.SqlServer.DacFx.Projects" Version="0.6.3-preview" />
-    <PackageVersion Include="System.CommandLine" Version="2.0.7" />
+    <PackageVersion Include="System.CommandLine" Version="2.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.7" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.7" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.7" />
