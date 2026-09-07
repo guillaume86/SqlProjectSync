@@ -202,6 +202,153 @@ public class ChangedTableRewriterTests : IClassFixture<SqlContainerFixture>
         publish.ErrorMessage.ShouldContain("startIndex");
     }
 
+    [Fact]
+    public async Task ChangedTrigger_WithStoredHeader_KeepsSingleHeader()
+    {
+        await using var scenario = await Scenario.CreateAsync(_fixture);
+        if (scenario is null)
+        {
+            return;
+        }
+
+        // Project: trigger deletes one memo column. DB: same trigger (header stored
+        // as part of its definition, as SQL Server does) now covering two columns,
+        // plus a column type change so the table goes through the rewriter.
+        WriteDemoProject(scenario, headerCopies: 1, memoColumns: "deleted.MemoId", nameLength: 50);
+        await CreateDemoDatabaseAsync(scenario, nameLength: 100);
+        await scenario.ExecAsync(TriggerHeader + TriggerBody("deleted.MemoId, deleted.Memo2Id"));
+
+        var (success, error) = scenario.ApplyWithRewriter();
+
+        success.ShouldBeTrue(customMessage: error);
+        var demo = scenario.ReadTable("Demo.sql");
+        CountOccurrences(demo, "-- Author:").ShouldBe(1, customMessage: demo);
+        demo.ShouldContain("deleted.Memo2Id");
+        demo.ShouldContain("NVARCHAR (100)");
+        demo.ShouldNotContain("\r\n\r\n\r\n", customMessage: demo);
+    }
+
+    [Fact]
+    public async Task ChangedTriggerOnly_WithStoredHeader_KeepsSingleHeader()
+    {
+        await using var scenario = await Scenario.CreateAsync(_fixture);
+        if (scenario is null)
+        {
+            return;
+        }
+
+        // Same as above without the column change: the trigger body is the only
+        // difference, which is the shape every later sync saw in the wild.
+        WriteDemoProject(scenario, headerCopies: 1, memoColumns: "deleted.MemoId", nameLength: 50);
+        await CreateDemoDatabaseAsync(scenario, nameLength: 50);
+        await scenario.ExecAsync(TriggerHeader + TriggerBody("deleted.MemoId, deleted.Memo2Id"));
+
+        var (success, error) = scenario.ApplyWithRewriter();
+
+        success.ShouldBeTrue(customMessage: error);
+        var demo = scenario.ReadTable("Demo.sql");
+        CountOccurrences(demo, "-- Author:").ShouldBe(1, customMessage: demo);
+        demo.ShouldContain("deleted.Memo2Id");
+    }
+
+    [Fact]
+    public async Task StackedTriggerHeaders_AreReplacedByTheStoredHeader()
+    {
+        await using var scenario = await Scenario.CreateAsync(_fixture);
+        if (scenario is null)
+        {
+            return;
+        }
+
+        // Project already damaged by earlier syncs (three stacked headers); the DB
+        // trigger has one. Comments take part in the comparison, so the trigger
+        // is reported as changed and the rewrite must collapse the stack.
+        WriteDemoProject(scenario, headerCopies: 3, memoColumns: "deleted.MemoId", nameLength: 50);
+        await CreateDemoDatabaseAsync(scenario, nameLength: 100);
+        await scenario.ExecAsync(TriggerHeader + TriggerBody("deleted.MemoId"));
+
+        var (success, error) = scenario.ApplyWithRewriter();
+
+        success.ShouldBeTrue(customMessage: error);
+        var demo = scenario.ReadTable("Demo.sql");
+        CountOccurrences(demo, "-- Author:").ShouldBe(1, customMessage: demo);
+        CountOccurrences(demo, "CREATE TRIGGER").ShouldBe(1, customMessage: demo);
+    }
+
+    [Fact]
+    public async Task DroppedTrigger_TakesItsHeaderAlong()
+    {
+        await using var scenario = await Scenario.CreateAsync(_fixture);
+        if (scenario is null)
+        {
+            return;
+        }
+
+        WriteDemoProject(scenario, headerCopies: 1, memoColumns: "deleted.MemoId", nameLength: 50);
+        await CreateDemoDatabaseAsync(scenario, nameLength: 100);
+
+        var (success, error) = scenario.ApplyWithRewriter();
+
+        success.ShouldBeTrue(customMessage: error);
+        var demo = scenario.ReadTable("Demo.sql");
+        demo.ShouldNotContain("CREATE TRIGGER", customMessage: demo);
+        demo.ShouldNotContain("-- Author:", customMessage: demo);
+        demo.ShouldContain("NVARCHAR (100)");
+    }
+
+    private const string TriggerHeader =
+        "-- =============================================\r\n"
+        + "-- Author:\t\tAuto Generated\r\n"
+        + "-- Description:\tDelete orphaned Memo rows\r\n"
+        + "-- =============================================\r\n";
+
+    private static string TriggerBody(string memoColumns) => $"""
+        CREATE TRIGGER [dbo].[Tr_Demo_AfterDelete_DeleteMemo]
+            ON  [dbo].[Demo]
+            AFTER DELETE
+        AS
+        BEGIN
+            SET NOCOUNT ON;
+
+            DELETE t
+            FROM [dbo].[Memo] t
+            JOIN deleted ON t.[MemoId] IN ({memoColumns})
+        END
+        """;
+
+    /// <summary>Demo + Memo tables in the project; Demo carries the header-prefixed trigger.</summary>
+    private static void WriteDemoProject(Scenario scenario, int headerCopies, string memoColumns, int nameLength)
+    {
+        scenario.WriteTable("Memo.sql", "CREATE TABLE [dbo].[Memo] ([MemoId] INT NOT NULL CONSTRAINT [PK_Memo] PRIMARY KEY);");
+
+        var headers = string.Concat(Enumerable.Repeat(TriggerHeader, headerCopies));
+        scenario.WriteTable("Demo.sql", $"""
+            CREATE TABLE [dbo].[Demo] (
+                [Id]      INT           NOT NULL,
+                [Name]    NVARCHAR ({nameLength}) NULL,
+                [MemoId]  INT           NULL,
+                [Memo2Id] INT           NULL,
+                CONSTRAINT [PK_Demo] PRIMARY KEY CLUSTERED ([Id] ASC)
+            );
+            GO
+
+            """ + headers + TriggerBody(memoColumns) + "\r\nGO\r\n");
+    }
+
+    /// <summary>Demo + Memo tables in the database, without the trigger.</summary>
+    private static async Task CreateDemoDatabaseAsync(Scenario scenario, int nameLength)
+    {
+        await scenario.ExecAsync("CREATE TABLE [dbo].[Memo] ([MemoId] INT NOT NULL CONSTRAINT [PK_Memo] PRIMARY KEY);");
+        await scenario.ExecAsync($"""
+            CREATE TABLE [dbo].[Demo] (
+                [Id] INT NOT NULL CONSTRAINT [PK_Demo] PRIMARY KEY,
+                [Name] NVARCHAR({nameLength}) NULL,
+                [MemoId] INT NULL,
+                [Memo2Id] INT NULL
+            );
+            """);
+    }
+
     private static int CountOccurrences(string haystack, string needle)
     {
         var count = 0;

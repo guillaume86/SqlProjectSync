@@ -6,6 +6,24 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.4] — 2026-09-07
+
+### Fixed
+
+- `ChangedTableRewriter` no longer stacks a trigger's header comment on every
+  sync. SQL Server stores a trigger's leading comments as part of its
+  definition, so the script DacFx produces for a changed trigger already
+  carries the header; the rewriter spliced it in over the `CREATE TRIGGER`
+  fragment only, leaving the file's existing header above it. Because comments
+  take part in the comparison, the now-mismatched trigger was reported as
+  changed again on the next sync, and the stack grew by one copy per run —
+  70 copies on Mpleo's `BsItem.sql`. A database deployed from such a file
+  inherits the stack and doubles it on the next sync. Replaced and removed
+  standalone statements now take the comment run that precedes them along
+  (`LeadingCommentStart`), and generated scripts are trimmed on both ends so
+  the newline SQL Server keeps in front of a stored definition no longer lands
+  as a stray blank line.
+
 ## [0.4.3] — 2026-06-18
 
 ### Fixed

@@ -31,6 +31,15 @@ namespace SqlProjectSync;
 /// removed, or replaced separately. Statements the comparison didn't touch (an
 /// unchanged index or trigger in the same file) are preserved byte-for-byte.
 /// </para>
+///
+/// <para>
+/// A replaced or removed standalone statement takes the comment run that
+/// precedes it along. SQL Server keeps a trigger's leading comments as part of
+/// its definition, so the script DacFx hands back for a changed trigger already
+/// carries its own header; splicing only the <c>CREATE TRIGGER</c> fragment left
+/// the file's old header in place above the new one, and every later sync
+/// stacked another copy (70 on Mpleo's <c>BsItem.sql</c> before this was fixed).
+/// </para>
 /// </summary>
 internal static partial class ChangedTableRewriter
 {
@@ -254,7 +263,8 @@ internal static partial class ChangedTableRewriter
                     var stmt = FindStandalone(script, op.ObjectName);
                     if (stmt is not null)
                     {
-                        edits.Add((stmt.StartOffset, stmt.FragmentLength, Normalize(op.Script!, lineEnding)));
+                        var (start, length) = ReplacementSpan(stmt);
+                        edits.Add((start, length, Normalize(op.Script!, lineEnding)));
                     }
                     else
                     {
@@ -288,10 +298,15 @@ internal static partial class ChangedTableRewriter
         return true;
     }
 
-    /// <summary>Normalizes a generated script: trims trailing whitespace and re-applies the file's line ending.</summary>
+    /// <summary>
+    /// Normalizes a generated script: trims surrounding whitespace and re-applies
+    /// the file's line ending. Leading whitespace goes too — SQL Server stores a
+    /// trigger definition with the newline that preceded its header in the
+    /// original batch, which would otherwise land in the file as a stray blank line.
+    /// </summary>
     private static string Normalize(string script, string lineEnding)
     {
-        var text = script.Replace("\r\n", "\n").TrimEnd();
+        var text = script.Replace("\r\n", "\n").Trim();
         return lineEnding == "\r\n" ? text.Replace("\n", "\r\n") : text;
     }
 
@@ -396,15 +411,65 @@ internal static partial class ChangedTableRewriter
         id.Parts.Count > 0 ? id.Parts[^1] : id.ToString() ?? string.Empty;
 
     /// <summary>
-    /// Computes a removal span covering the statement, its trailing <c>GO</c>,
-    /// and any following whitespace-only lines — mirroring
-    /// <see cref="InlineConstraintFolder"/>'s span logic so a deleted index
-    /// leaves no stranded blank lines.
+    /// Span of a standalone statement together with the comment run that
+    /// precedes it (see <see cref="LeadingCommentStart"/>), i.e. the text a
+    /// replacement script from DacFx supersedes.
     /// </summary>
-    private static (int Start, int Length) RemovalSpan(string text, TSqlFragment fragment)
+    internal static (int Start, int Length) ReplacementSpan(TSqlStatement statement)
     {
-        var start = fragment.StartOffset;
-        var end = fragment.StartOffset + fragment.FragmentLength;
+        var start = LeadingCommentStart(statement);
+        return (start, statement.StartOffset + statement.FragmentLength - start);
+    }
+
+    /// <summary>
+    /// Offset of the first comment in the run of comments (and interleaved
+    /// whitespace) that directly precedes <paramref name="statement"/>, or the
+    /// statement's own start when only whitespace precedes it. The walk stops at
+    /// the first other token — typically the previous batch's <c>GO</c> — so a
+    /// trailing comment that belongs to the previous batch is never captured.
+    /// Blank lines between that token and the first comment stay outside the
+    /// span, which keeps the file's section separator intact.
+    /// </summary>
+    internal static int LeadingCommentStart(TSqlStatement statement)
+    {
+        var start = statement.StartOffset;
+        var tokens = statement.ScriptTokenStream;
+        if (tokens is null)
+        {
+            return start;
+        }
+
+        for (var i = statement.FirstTokenIndex - 1; i >= 0; i--)
+        {
+            var token = tokens[i];
+            switch (token.TokenType)
+            {
+                case TSqlTokenType.WhiteSpace:
+                    continue;
+
+                case TSqlTokenType.SingleLineComment:
+                case TSqlTokenType.MultilineComment:
+                    start = token.Offset;
+                    continue;
+
+                default:
+                    return start;
+            }
+        }
+
+        return start;
+    }
+
+    /// <summary>
+    /// Computes a removal span covering the statement's leading comments, the
+    /// statement, its trailing <c>GO</c>, and any following whitespace-only
+    /// lines — mirroring <see cref="InlineConstraintFolder"/>'s span logic so a
+    /// deleted index or trigger leaves neither a stranded header nor blank lines.
+    /// </summary>
+    private static (int Start, int Length) RemovalSpan(string text, TSqlStatement statement)
+    {
+        var start = LeadingCommentStart(statement);
+        var end = statement.StartOffset + statement.FragmentLength;
 
         while (end < text.Length && (text[end] is ' ' or '\t' or '\r' or '\n'))
         {
