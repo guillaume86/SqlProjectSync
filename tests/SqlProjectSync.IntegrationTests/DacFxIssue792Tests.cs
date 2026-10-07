@@ -7,14 +7,16 @@ using Xunit;
 namespace SqlProjectSync.IntegrationTests;
 
 /// <summary>
-/// Tripwire for <see href="https://github.com/microsoft/DacFx/issues/792">DacFx #792</see>.
-/// Drives <see cref="SchemaComparisonResult.PublishChangesToProject(string, DacExtractTarget)"/>
+/// Regression guard for <see href="https://github.com/microsoft/DacFx/issues/792">DacFx #792</see>,
+/// fixed upstream in DacFx 170.5. Drives
+/// <see cref="SchemaComparisonResult.PublishChangesToProject(string, DacExtractTarget)"/>
 /// directly — bypassing <see cref="SchemaSync"/> and the post-publish
-/// inline-constraint folder — and asserts that the bug is still present.
+/// inline-constraint folder — and asserts that a constraint already declared
+/// inline is not emitted a second time as a trailing <c>ALTER TABLE ADD CONSTRAINT</c>.
 ///
-/// When this test starts failing, DacFx has fixed the upstream issue and the
-/// workaround in <c>InlineConstraintFolder</c> can be removed. The Shouldly
-/// message on the failing assertion spells that out.
+/// SqlProjectSync used to strip that duplicate itself; the dedup pass was
+/// removed once DacFx shipped the fix. If this test starts failing after a
+/// DacFx bump, the bug is back and the dedup pass needs to return.
 ///
 /// Matches the minimal repro filed with the issue:
 /// https://gist.github.com/guillaume86/d5a4ce3c6ba1b21f2fd35433ce560561
@@ -29,7 +31,7 @@ public class DacFxIssue792Tests : IClassFixture<SqlContainerFixture>
     }
 
     [Fact]
-    public async Task PublishChangesToProject_Still_Emits_Duplicate_Inline_Constraint()
+    public async Task PublishChangesToProject_Does_Not_Duplicate_Inline_Constraint()
     {
         if (!_fixture.IsAvailable)
         {
@@ -80,8 +82,8 @@ public class DacFxIssue792Tests : IClassFixture<SqlContainerFixture>
 
             // Mutate the DB: add a column with an inline DEFAULT that the
             // project doesn't have. PublishChangesToProject should propagate
-            // exactly that — but DacFx emits the constraint both inline AND as
-            // a trailing ALTER TABLE in the same file.
+            // exactly that. Before DacFx 170.5 it emitted the constraint both
+            // inline AND as a trailing ALTER TABLE in the same file.
             await Exec(dbConn, """
                 ALTER TABLE [dbo].[Demo]
                     ADD [Note] NVARCHAR(50) NULL CONSTRAINT [DF_Demo_Note] DEFAULT ('hello');
@@ -106,13 +108,11 @@ public class DacFxIssue792Tests : IClassFixture<SqlContainerFixture>
                 "CONSTRAINT [DF_Demo_Note] DEFAULT",
                 customMessage: "Sanity check — the inline DEFAULT should always be present after publish.");
 
-            const string upstreamFixedMessage =
-                "DacFx #792 appears to have been fixed: PublishChangesToProject no longer emits a redundant " +
-                "ALTER TABLE ADD CONSTRAINT for a constraint already defined inline. " +
-                "Drop InlineConstraintFolder + the SchemaSync.Apply call site + the InlineConstraintsMode " +
-                "option, then delete this tripwire test. See https://github.com/microsoft/DacFx/issues/792.";
-
-            after.ShouldContain("ADD CONSTRAINT [DF_Demo_Note]", customMessage: upstreamFixedMessage);
+            after.ShouldNotContain(
+                "ADD CONSTRAINT [DF_Demo_Note]",
+                customMessage: "DacFx #792 has regressed: PublishChangesToProject emitted a redundant " +
+                    "ALTER TABLE ADD CONSTRAINT for a constraint already defined inline. Restore the dedup " +
+                    "pass in InlineConstraintFolder. See https://github.com/microsoft/DacFx/issues/792.");
         }
         finally
         {
