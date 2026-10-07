@@ -4,13 +4,9 @@ namespace SqlProjectSync;
 /// Controls how <see cref="SchemaSync.Apply"/> reshapes the trailing
 /// <c>ALTER TABLE ADD CONSTRAINT</c> statements that
 /// <see cref="Microsoft.SqlServer.Dac.Compare.SchemaComparisonResult.PublishChangesToProject(string, Microsoft.SqlServer.Dac.DacExtractTarget)"/>
-/// emits as a side-effect of <see href="https://github.com/microsoft/DacFx/issues/792">DacFx #792</see>.
+/// emits for constraints coming from a database source (see the follow-up on
+/// <see href="https://github.com/microsoft/DacFx/issues/792">DacFx #792</see>).
 /// Mirrors DacFx's internal <c>CreateTableInlineConstraintsMode</c>.
-///
-/// Regardless of the selected mode the dedup pass still runs: every standalone
-/// <c>ALTER</c> whose constraint name is already declared inline is dropped,
-/// because the duplicate produces a model validation error that has to be
-/// removed.
 /// </summary>
 public enum InlineConstraintsMode
 {

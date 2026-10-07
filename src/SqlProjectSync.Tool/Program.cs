@@ -27,7 +27,7 @@ var folderStructureOption = new Option<DacExtractTarget>("--folder-structure")
 
 var inlineConstraintsOption = new Option<InlineConstraintsMode>("--inline-constraints")
 {
-    Description = "Reshape standalone ALTER TABLE ADD CONSTRAINT into CREATE TABLE (None|ModelFidelity). Redundant inline duplicates are always dropped regardless.",
+    Description = "Reshape standalone ALTER TABLE ADD CONSTRAINT into CREATE TABLE (None|ModelFidelity).",
     DefaultValueFactory = _ => InlineConstraintsMode.None,
 };
 

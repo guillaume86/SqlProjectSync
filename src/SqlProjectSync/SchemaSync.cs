@@ -102,19 +102,18 @@ public static partial class SchemaSync
         var rewrittenFiles = ChangedTableRewriter.Execute(rewritePlans, logger);
         var result = PublishResult.FromDacFx(publish).WithAdditionalChangedFiles(rewrittenFiles);
 
-        // Workaround for https://github.com/microsoft/DacFx/issues/792:
-        // PublishChangesToProject emits each constraint as a trailing
-        // ALTER TABLE ADD CONSTRAINT, sometimes in addition to an inline copy
-        // inside CREATE TABLE (the duplicate-definition case that breaks model
-        // validation) and sometimes instead of one (when the source endpoint
-        // is a database, producing standalone-only output). The dedup pass is
-        // mandatory: duplicates fail model validation, so they always go.
-        // Lifting standalones inline is opt-in via SyncOptions.InlineConstraintsMode.
+        // PublishChangesToProject emits database-sourced constraints as
+        // trailing ALTER TABLE ADD CONSTRAINT statements and offers no public
+        // switch for the inline form. Lifting them into CREATE TABLE is opt-in
+        // via SyncOptions.InlineConstraintsMode.
         var touched = new HashSet<string>(result.AddedFiles, StringComparer.OrdinalIgnoreCase);
         touched.UnionWith(result.ChangedFiles);
         if (touched.Count > 0)
         {
-            InlineConstraintFolder.Fold(touched, comparison.InlineConstraintsMode, logger);
+            if (comparison.InlineConstraintsMode == InlineConstraintsMode.ModelFidelity)
+            {
+                InlineConstraintFolder.Fold(touched, logger);
+            }
             if (comparison.TrimLeadingBlankLines)
             {
                 LeadingBlankTrimmer.Cleanup(touched, logger);

@@ -4,20 +4,19 @@ using Microsoft.SqlServer.TransactSql.ScriptDom;
 namespace SqlProjectSync;
 
 /// <summary>
-/// Workaround for <see href="https://github.com/microsoft/DacFx/issues/792">DacFx #792</see>:
+/// Backs <see cref="InlineConstraintsMode.ModelFidelity"/>:
 /// <see cref="Microsoft.SqlServer.Dac.Compare.SchemaComparisonResult.PublishChangesToProject(string, Microsoft.SqlServer.Dac.DacExtractTarget)"/>
-/// emits each PK / FK / CHECK / UNIQUE / DEFAULT constraint as a trailing
-/// <c>ALTER TABLE ADD CONSTRAINT</c> in the same file, sometimes *in addition* to
-/// an inline declaration inside <c>CREATE TABLE</c> (the duplicate case),
-/// sometimes instead of it (when the source endpoint is a database and the
-/// constraint has no inline annotation). Both shapes diverge from the legacy
-/// VS-tool convention of inline-only constraints.
+/// emits each PK / FK / CHECK / UNIQUE / DEFAULT constraint coming from a
+/// database source as a trailing <c>ALTER TABLE ADD CONSTRAINT</c> in the same
+/// file, because those constraints carry no inline annotation. That diverges
+/// from the legacy VS-tool convention of inline-only constraints. DacFx exposes
+/// no public option to choose the inline form (see the follow-up on
+/// <see href="https://github.com/microsoft/DacFx/issues/792">DacFx #792</see>).
 ///
 /// This helper parses each touched <c>.sql</c> file with <see cref="TSql160Parser"/>,
 /// matches every top-level <c>ALTER TABLE ... ADD CONSTRAINT</c> against the
-/// <c>CREATE TABLE</c> for the same table earlier in the file, and either drops
-/// the ALTER (when the constraint is already inline) or lifts it inline (when
-/// it isn't). Untouched batches keep their original whitespace.
+/// <c>CREATE TABLE</c> for the same table earlier in the file, and lifts it
+/// inline. Untouched batches keep their original whitespace.
 /// </summary>
 internal static partial class InlineConstraintFolder
 {
@@ -25,11 +24,9 @@ internal static partial class InlineConstraintFolder
     /// Walks <paramref name="filePaths"/>, folds trailing
     /// <c>ALTER TABLE ADD CONSTRAINT</c> blocks back into their parent
     /// <c>CREATE TABLE</c>, and rewrites each file only when at least one
-    /// batch was dropped or lifted. The drop pass (already-inline duplicates)
-    /// always runs; the lift pass (standalone-only constraints) only runs
-    /// when <paramref name="mode"/> is <see cref="InlineConstraintsMode.ModelFidelity"/>.
+    /// batch was lifted.
     /// </summary>
-    public static void Fold(IEnumerable<string> filePaths, InlineConstraintsMode mode, ILogger logger)
+    public static void Fold(IEnumerable<string> filePaths, ILogger logger)
     {
         foreach (var path in filePaths)
         {
@@ -40,7 +37,7 @@ internal static partial class InlineConstraintFolder
 
             try
             {
-                FoldFile(path, mode, logger);
+                FoldFile(path, logger);
             }
             catch (Exception ex)
             {
@@ -49,7 +46,7 @@ internal static partial class InlineConstraintFolder
         }
     }
 
-    internal static int FoldFile(string filePath, InlineConstraintsMode mode, ILogger logger)
+    internal static int FoldFile(string filePath, ILogger logger)
     {
         var originalText = File.ReadAllText(filePath);
         if (string.IsNullOrWhiteSpace(originalText))
@@ -77,17 +74,17 @@ internal static partial class InlineConstraintFolder
             return 0;
         }
 
-        var batchActions = new List<(int Start, int Length, string ConstraintName, bool Lifted)>();
+        var batchActions = new List<(int Start, int Length, string ConstraintName)>();
 
         foreach (var batch in script.Batches)
         {
-            if (!TryFoldBatch(batch, tables, mode, out var firstName, out var anyLift))
+            if (!TryFoldBatch(batch, tables, out var firstName))
             {
                 continue;
             }
 
             var span = ComputeRemovalSpan(originalText, batch);
-            batchActions.Add((span.Start, span.Length, firstName, anyLift));
+            batchActions.Add((span.Start, span.Length, firstName));
         }
 
         if (batchActions.Count == 0)
@@ -102,7 +99,7 @@ internal static partial class InlineConstraintFolder
         // that was previously consistent.
         var lineEnding = DetectLineEnding(originalText);
         var edits = new List<(int Start, int Length, string Replacement)>();
-        foreach (var (start, length, _, _) in batchActions)
+        foreach (var (start, length, _) in batchActions)
         {
             edits.Add((start, length, string.Empty));
         }
@@ -131,16 +128,9 @@ internal static partial class InlineConstraintFolder
 
         File.WriteAllText(filePath, rewritten);
 
-        foreach (var (_, _, name, lifted) in batchActions)
+        foreach (var (_, _, name) in batchActions)
         {
-            if (lifted)
-            {
-                LogLifted(logger, filePath, name);
-            }
-            else
-            {
-                LogDropped(logger, filePath, name);
-            }
+            LogLifted(logger, filePath, name);
         }
 
         return batchActions.Count;
@@ -208,22 +198,18 @@ internal static partial class InlineConstraintFolder
     ///   <item>Returns <c>false</c> when the batch isn't a pure-constraint
     ///     <see cref="AlterTableAddTableElementStatement"/> targeting a
     ///     <see cref="CreateTableStatement"/> in this file.</item>
-    ///   <item>Returns <c>true</c> when every constraint in the batch can
-    ///     be either dropped (already inline) or lifted (passes all guards).
-    ///     Mutates the matching <see cref="CreateTableContext"/> in place for
-    ///     each lift.</item>
+    ///   <item>Returns <c>true</c> when every constraint in the batch passes
+    ///     all lift guards. Mutates the matching <see cref="CreateTableContext"/>
+    ///     in place for each lift.</item>
     /// </list>
     /// All-or-nothing per batch — any guard failure aborts the batch entirely.
     /// </summary>
     private static bool TryFoldBatch(
         TSqlBatch batch,
         Dictionary<string, CreateTableContext> tables,
-        InlineConstraintsMode mode,
-        out string firstConstraintName,
-        out bool anyLifted)
+        out string firstConstraintName)
     {
         firstConstraintName = string.Empty;
-        anyLifted = false;
 
         if (batch.Statements.Count != 1 || batch.Statements[0] is not AlterTableAddTableElementStatement alter)
         {
@@ -281,13 +267,13 @@ internal static partial class InlineConstraintFolder
             return false;
         }
 
-        // First pass: classify + check guards on every op.
+        // First pass: check guards on every op.
         foreach (var op in ops)
         {
+            // Name already declared inline → lifting would define it twice.
             if (ctx.InlineNames.Contains(op.Name))
             {
-                op.Decision = OpDecision.Drop;
-                continue;
+                return false;
             }
 
             if (op.ColumnDefault is not null)
@@ -307,7 +293,6 @@ internal static partial class InlineConstraintFolder
                     return false;
                 }
                 op.TargetColumn = targetCol;
-                op.Decision = OpDecision.Lift;
                 continue;
             }
 
@@ -319,7 +304,6 @@ internal static partial class InlineConstraintFolder
                 {
                     return false;
                 }
-                op.Decision = OpDecision.Lift;
                 continue;
             }
 
@@ -327,34 +311,22 @@ internal static partial class InlineConstraintFolder
             return false;
         }
 
-        // Mode gate: in None mode, leave any batch containing a Lift alone.
-        // Pure-Drop batches (already-inline duplicates) still go through —
-        // dedup is mandatory because the duplicate fails model validation.
-        if (mode == InlineConstraintsMode.None && ops.Any(o => o.Decision == OpDecision.Lift))
-        {
-            return false;
-        }
-
         // Second pass: apply.
         foreach (var op in ops)
         {
-            if (op.Decision == OpDecision.Lift)
+            if (op.ColumnDefault is not null && op.TargetColumn is not null)
             {
-                if (op.ColumnDefault is not null && op.TargetColumn is not null)
-                {
-                    // The "FOR [col]" clause is implicit when inline; clear
-                    // it so the script generator doesn't reattach it.
-                    op.ColumnDefault.Column = null;
-                    op.TargetColumn.DefaultConstraint = op.ColumnDefault;
-                }
-                else if (op.TableConstraint is not null)
-                {
-                    ctx.Statement.Definition!.TableConstraints.Add(op.TableConstraint);
-                }
-                ctx.InlineNames.Add(op.Name);
-                ctx.Modified = true;
-                anyLifted = true;
+                // The "FOR [col]" clause is implicit when inline; clear
+                // it so the script generator doesn't reattach it.
+                op.ColumnDefault.Column = null;
+                op.TargetColumn.DefaultConstraint = op.ColumnDefault;
             }
+            else if (op.TableConstraint is not null)
+            {
+                ctx.Statement.Definition!.TableConstraints.Add(op.TableConstraint);
+            }
+            ctx.InlineNames.Add(op.Name);
+            ctx.Modified = true;
         }
 
         firstConstraintName = ops[0].Name;
@@ -540,12 +512,6 @@ internal static partial class InlineConstraintFolder
         }
     }
 
-    private enum OpDecision
-    {
-        Drop,
-        Lift,
-    }
-
     private sealed class FoldOp
     {
         public FoldOp(string name, string? targetColumnName, DefaultConstraintDefinition? columnDefault, ConstraintDefinition? tableConstraint)
@@ -561,7 +527,6 @@ internal static partial class InlineConstraintFolder
         public DefaultConstraintDefinition? ColumnDefault { get; }
         public ConstraintDefinition? TableConstraint { get; }
         public ColumnDefinition? TargetColumn { get; set; }
-        public OpDecision Decision { get; set; }
     }
 
     [LoggerMessage(
@@ -575,12 +540,7 @@ internal static partial class InlineConstraintFolder
     private static partial void LogFoldFailed(ILogger logger, string file, string reason);
 
     [LoggerMessage(
-        Level = LogLevel.Debug,
-        Message = "Dropped redundant ALTER TABLE ADD CONSTRAINT [{Constraint}] in '{File}' (DacFx #792 workaround).")]
-    private static partial void LogDropped(ILogger logger, string file, string constraint);
-
-    [LoggerMessage(
         Level = LogLevel.Trace,
-        Message = "Lifted ALTER TABLE ADD CONSTRAINT [{Constraint}] into CREATE TABLE in '{File}' (DacFx #792 workaround).")]
+        Message = "Lifted ALTER TABLE ADD CONSTRAINT [{Constraint}] into CREATE TABLE in '{File}'.")]
     private static partial void LogLifted(ILogger logger, string file, string constraint);
 }
