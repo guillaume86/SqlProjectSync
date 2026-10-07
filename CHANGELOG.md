@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-10-07
+
 ### Changed
 
 - Bumped `Microsoft.SqlServer.DacFx` from `170.4.80-preview` to the stable
