@@ -8,7 +8,8 @@ namespace SqlProjectSync;
 
 /// <summary>
 /// Workaround for a <see cref="SchemaComparisonResult.PublishChangesToProject(string, Microsoft.SqlServer.Dac.DacExtractTarget)"/>
-/// crash (<c>startIndex ('-1') must be a non-negative value</c>) on table changes.
+/// crash (<c>startIndex ('-1') must be a non-negative value</c>) on table changes
+/// (<see href="https://github.com/microsoft/DacFx/issues/858">DacFx #858</see>).
 ///
 /// <para>
 /// When a table-level <c>Change</c> difference has object children that live in

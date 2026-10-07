@@ -90,6 +90,7 @@ public static partial class SchemaSync
         // PublishChangesToProject throws "startIndex ('-1')" when a table's inline
         // column/constraint children edit the same file before its whole-table
         // replace runs; ChangedTableRewriter rewrites those files itself.
+        // https://github.com/microsoft/DacFx/issues/858
         var rewritePlans = ChangedTableRewriter.Plan(comparison.Inner, logger);
 
         var publish = comparison.Inner.PublishChangesToProject(projectDir, comparison.FolderStructure);

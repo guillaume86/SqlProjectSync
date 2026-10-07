@@ -10,8 +10,8 @@ namespace SqlProjectSync;
 /// database source as a trailing <c>ALTER TABLE ADD CONSTRAINT</c> in the same
 /// file, because those constraints carry no inline annotation. That diverges
 /// from the legacy VS-tool convention of inline-only constraints. DacFx exposes
-/// no public option to choose the inline form (see the follow-up on
-/// <see href="https://github.com/microsoft/DacFx/issues/792">DacFx #792</see>).
+/// no public option to choose the inline form
+/// (<see href="https://github.com/microsoft/DacFx/issues/857">DacFx #857</see>).
 ///
 /// This helper parses each touched <c>.sql</c> file with <see cref="TSql160Parser"/>,
 /// matches every top-level <c>ALTER TABLE ... ADD CONSTRAINT</c> against the

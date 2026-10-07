@@ -16,7 +16,8 @@ namespace SqlProjectSync.IntegrationTests;
 /// and Olivier hit on Mpleo (a column rename with a referencing FK, and a primary-key
 /// column change). These tests reproduce both shapes and assert the rewriter applies
 /// them cleanly. <see cref="RawPublishChangesToProject_StillCrashesOnColumnRename"/> is
-/// the tripwire that flips when DacFx fixes the bug upstream.
+/// the tripwire that flips when DacFx fixes the bug upstream
+/// (<see href="https://github.com/microsoft/DacFx/issues/858">DacFx #858</see>).
 /// </summary>
 [Trait("Style", "Sdk")]
 public class ChangedTableRewriterTests : IClassFixture<SqlContainerFixture>
@@ -198,7 +199,8 @@ public class ChangedTableRewriterTests : IClassFixture<SqlContainerFixture>
 
         publish.Success.ShouldBeFalse(
             customMessage: "DacFx PublishChangesToProject appears fixed for in-place table changes — "
-                + "the ChangedTableRewriter workaround and this tripwire can be revisited.");
+                + "the ChangedTableRewriter workaround and this tripwire can be revisited. "
+                + "See https://github.com/microsoft/DacFx/issues/858.");
         publish.ErrorMessage.ShouldContain("startIndex");
     }
 
