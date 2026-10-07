@@ -6,6 +6,16 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Bumped `Microsoft.SqlServer.DacFx` from `170.4.80-preview` to the stable
+  `170.5.96`, which ships the upstream fix for
+  [DacFx #792](https://github.com/microsoft/DacFx/issues/792):
+  `PublishChangesToProject` no longer emits a redundant
+  `ALTER TABLE ADD CONSTRAINT` for a constraint already declared inline.
+  `DacFxIssue792Tests` flips from a tripwire into a regression guard that
+  asserts the duplicate stays gone.
+
 ## [0.4.4] — 2026-09-07
 
 ### Fixed
