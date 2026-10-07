@@ -16,6 +16,18 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `DacFxIssue792Tests` flips from a tripwire into a regression guard that
   asserts the duplicate stays gone.
 
+### Removed
+
+- The mandatory dedup pass in `InlineConstraintFolder`, which stripped a
+  trailing `ALTER TABLE ADD CONSTRAINT` when the same constraint was already
+  declared inline. DacFx 170.5 no longer emits that duplicate. With
+  `InlineConstraintsMode.None` (the default), `SchemaSync.Apply` now leaves
+  DacFx's constraint output untouched. The opt-in lift (`ModelFidelity` /
+  `--inline-constraints ModelFidelity`) is unchanged, because DacFx still
+  writes database-sourced constraints as standalone `ALTER` statements. It now
+  leaves an `ALTER` alone when its constraint name is already declared inline,
+  where it used to drop it.
+
 ## [0.4.4] — 2026-09-07
 
 ### Fixed

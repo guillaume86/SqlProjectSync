@@ -7,81 +7,6 @@ namespace SqlProjectSync.Tests;
 public class InlineConstraintFolderTests
 {
     [Fact]
-    public void Strips_Trailing_Alter_That_Duplicates_Inline_Default()
-    {
-        using var dir = new TempDirectory();
-        var path = dir.Write(
-            "dbo/Tables/Demo.sql",
-            """
-            CREATE TABLE [dbo].[Demo] (
-                [Id]   INT NOT NULL,
-                [Note] NVARCHAR (50) CONSTRAINT [DF_Demo_Note] DEFAULT ('hello') NULL,
-                PRIMARY KEY CLUSTERED ([Id] ASC)
-            );
-            GO
-            ALTER TABLE [dbo].[Demo]
-                ADD CONSTRAINT [DF_Demo_Note] DEFAULT ('hello') FOR [Note];
-            GO
-
-            """);
-
-        var dropped = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.None, NullLogger.Instance);
-
-        dropped.ShouldBe(1);
-        var after = File.ReadAllText(path);
-        after.ShouldContain("CONSTRAINT [DF_Demo_Note] DEFAULT");
-        after.ShouldNotContain("ADD CONSTRAINT [DF_Demo_Note]");
-    }
-
-    [Fact]
-    public void Strips_Trailing_Alter_That_Duplicates_Inline_Check()
-    {
-        using var dir = new TempDirectory();
-        var path = dir.Write(
-            "dbo/Tables/Demo.sql",
-            """
-            CREATE TABLE [dbo].[Demo] (
-                [Id]        INT NOT NULL,
-                [Algorithm] VARCHAR (10) NOT NULL,
-                CONSTRAINT [CK_Demo_Algorithm] CHECK ([Algorithm]='RS256')
-            );
-            GO
-            ALTER TABLE [dbo].[Demo]
-                ADD CONSTRAINT [CK_Demo_Algorithm] CHECK ([Algorithm]='RS256');
-            GO
-            """);
-
-        var dropped = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.None, NullLogger.Instance);
-
-        dropped.ShouldBe(1);
-        File.ReadAllText(path).ShouldNotContain("ADD CONSTRAINT [CK_Demo_Algorithm]");
-    }
-
-    [Fact]
-    public void Strips_Trailing_Alter_That_Duplicates_Inline_ForeignKey()
-    {
-        using var dir = new TempDirectory();
-        var path = dir.Write(
-            "dbo/Tables/Demo.sql",
-            """
-            CREATE TABLE [dbo].[Demo] (
-                [Id]    INT NOT NULL,
-                [LogId] INT NULL,
-                CONSTRAINT [FK_Demo_SysLog] FOREIGN KEY ([LogId]) REFERENCES [dbo].[SysLog] ([LogId])
-            );
-            GO
-            ALTER TABLE [dbo].[Demo]
-                ADD CONSTRAINT [FK_Demo_SysLog] FOREIGN KEY ([LogId]) REFERENCES [dbo].[SysLog] ([LogId]);
-            GO
-            """);
-
-        var dropped = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.None, NullLogger.Instance);
-
-        dropped.ShouldBe(1);
-        File.ReadAllText(path).ShouldNotContain("ADD CONSTRAINT [FK_Demo_SysLog]");
-    }
-
-    [Fact]
     public void Lifts_Standalone_Default_Into_Column_Definition()
     {
         using var dir = new TempDirectory();
@@ -98,7 +23,7 @@ public class InlineConstraintFolderTests
             GO
             """);
 
-        var folded = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.ModelFidelity, NullLogger.Instance);
+        var folded = InlineConstraintFolder.FoldFile(path, NullLogger.Instance);
 
         folded.ShouldBe(1);
         var after = File.ReadAllText(path);
@@ -123,7 +48,7 @@ public class InlineConstraintFolderTests
             GO
             """);
 
-        var folded = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.ModelFidelity, NullLogger.Instance);
+        var folded = InlineConstraintFolder.FoldFile(path, NullLogger.Instance);
 
         folded.ShouldBe(1);
         var after = File.ReadAllText(path);
@@ -148,7 +73,7 @@ public class InlineConstraintFolderTests
             GO
             """);
 
-        var folded = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.ModelFidelity, NullLogger.Instance);
+        var folded = InlineConstraintFolder.FoldFile(path, NullLogger.Instance);
 
         folded.ShouldBe(1);
         var after = File.ReadAllText(path);
@@ -172,7 +97,7 @@ public class InlineConstraintFolderTests
             GO
             """);
 
-        var folded = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.ModelFidelity, NullLogger.Instance);
+        var folded = InlineConstraintFolder.FoldFile(path, NullLogger.Instance);
 
         folded.ShouldBe(1);
         var after = File.ReadAllText(path);
@@ -197,7 +122,7 @@ public class InlineConstraintFolderTests
             GO
             """);
 
-        var folded = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.ModelFidelity, NullLogger.Instance);
+        var folded = InlineConstraintFolder.FoldFile(path, NullLogger.Instance);
 
         folded.ShouldBe(1);
         var after = File.ReadAllText(path);
@@ -206,7 +131,7 @@ public class InlineConstraintFolderTests
     }
 
     [Fact]
-    public void Lifts_Mixed_Batch_Of_Redundant_And_Liftable_Together()
+    public void Preserves_Alter_Whose_Constraint_Is_Already_Inline_But_Lifts_The_Rest()
     {
         using var dir = new TempDirectory();
         var path = dir.Write(
@@ -225,13 +150,14 @@ public class InlineConstraintFolderTests
             GO
             """);
 
-        var folded = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.ModelFidelity, NullLogger.Instance);
+        var folded = InlineConstraintFolder.FoldFile(path, NullLogger.Instance);
 
-        folded.ShouldBe(2);
+        // Lifting DF_Demo_Flag would define it twice, so its batch is left
+        // alone; the unrelated PK batch still lifts.
+        folded.ShouldBe(1);
         var after = File.ReadAllText(path);
-        after.ShouldNotContain("ADD CONSTRAINT [DF_Demo_Flag]");
+        after.ShouldContain("ADD CONSTRAINT [DF_Demo_Flag]");
         after.ShouldNotContain("ADD CONSTRAINT [PK_Demo]");
-        after.ShouldContain("CONSTRAINT [DF_Demo_Flag] DEFAULT");
         after.ShouldContain("CONSTRAINT [PK_Demo] PRIMARY KEY");
     }
 
@@ -252,7 +178,7 @@ public class InlineConstraintFolderTests
             """);
 
         var before = File.ReadAllText(path);
-        var folded = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.ModelFidelity, NullLogger.Instance);
+        var folded = InlineConstraintFolder.FoldFile(path, NullLogger.Instance);
 
         folded.ShouldBe(0);
         File.ReadAllText(path).ShouldBe(before);
@@ -276,7 +202,7 @@ public class InlineConstraintFolderTests
             """);
 
         var before = File.ReadAllText(path);
-        var folded = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.ModelFidelity, NullLogger.Instance);
+        var folded = InlineConstraintFolder.FoldFile(path, NullLogger.Instance);
 
         folded.ShouldBe(0);
         File.ReadAllText(path).ShouldBe(before);
@@ -300,7 +226,7 @@ public class InlineConstraintFolderTests
             """);
 
         var before = File.ReadAllText(path);
-        var folded = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.ModelFidelity, NullLogger.Instance);
+        var folded = InlineConstraintFolder.FoldFile(path, NullLogger.Instance);
 
         folded.ShouldBe(0);
         File.ReadAllText(path).ShouldBe(before);
@@ -323,7 +249,7 @@ public class InlineConstraintFolderTests
             """);
 
         var before = File.ReadAllText(path);
-        var folded = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.ModelFidelity, NullLogger.Instance);
+        var folded = InlineConstraintFolder.FoldFile(path, NullLogger.Instance);
 
         folded.ShouldBe(0);
         File.ReadAllText(path).ShouldBe(before);
@@ -347,61 +273,11 @@ public class InlineConstraintFolderTests
             """);
 
         var before = File.ReadAllText(path);
-        var dropped = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.None, NullLogger.Instance);
+        var folded = InlineConstraintFolder.FoldFile(path, NullLogger.Instance);
 
-        // Adding a column is not a pure constraint-add; we never strip these,
-        // even when one of the column's inline constraint names collides.
-        dropped.ShouldBe(0);
+        // Adding a column is not a pure constraint-add; we never lift these.
+        folded.ShouldBe(0);
         File.ReadAllText(path).ShouldBe(before);
-    }
-
-    [Fact]
-    public void Handles_Multiple_Redundant_Alters_Single_File()
-    {
-        using var dir = new TempDirectory();
-        var path = dir.Write(
-            "dbo/Tables/SysJwtSigningKey.sql",
-            """
-            CREATE TABLE [dbo].[SysJwtSigningKey] (
-                [JwtSigningKeyId] INT NOT NULL,
-                [Algorithm]       VARCHAR (10) NOT NULL,
-                [PrivateKeyPem]   NVARCHAR (MAX) NULL,
-                [PublicKeyPem]    NVARCHAR (MAX) NOT NULL,
-                [IsPrimary]       BIT NOT NULL,
-                [CreatedAt]       DATETIME CONSTRAINT [DF_SysJwtSigningKey_CreatedAt] DEFAULT (getdate()) NOT NULL,
-                CONSTRAINT [PK_SysJwtSigningKey] PRIMARY KEY CLUSTERED ([JwtSigningKeyId] ASC),
-                CONSTRAINT [CK_SysJwtSigningKey_Algorithm] CHECK ([Algorithm]='RS256'),
-                CONSTRAINT [CK_SysJwtSigningKey_PrivateKeyRequiredOnPrimary] CHECK ([IsPrimary]=(0) OR [PrivateKeyPem] IS NOT NULL)
-            );
-            GO
-
-
-            ALTER TABLE [dbo].[SysJwtSigningKey]
-                ADD CONSTRAINT [CK_SysJwtSigningKey_Algorithm] CHECK ([Algorithm]='RS256');
-            GO
-
-
-            ALTER TABLE [dbo].[SysJwtSigningKey]
-                ADD CONSTRAINT [CK_SysJwtSigningKey_PrivateKeyRequiredOnPrimary] CHECK ([IsPrimary]=(0) OR [PrivateKeyPem] IS NOT NULL);
-            GO
-
-
-            ALTER TABLE [dbo].[SysJwtSigningKey]
-                ADD CONSTRAINT [DF_SysJwtSigningKey_CreatedAt] DEFAULT (getdate()) FOR [CreatedAt];
-            GO
-            """);
-
-        var dropped = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.None, NullLogger.Instance);
-
-        dropped.ShouldBe(3);
-        var after = File.ReadAllText(path);
-        after.ShouldNotContain("ADD CONSTRAINT [CK_SysJwtSigningKey_Algorithm]");
-        after.ShouldNotContain("ADD CONSTRAINT [CK_SysJwtSigningKey_PrivateKeyRequiredOnPrimary]");
-        after.ShouldNotContain("ADD CONSTRAINT [DF_SysJwtSigningKey_CreatedAt]");
-        // Inline definitions and indexes remain.
-        after.ShouldContain("CONSTRAINT [PK_SysJwtSigningKey]");
-        after.ShouldContain("CONSTRAINT [CK_SysJwtSigningKey_Algorithm]");
-        after.ShouldContain("CONSTRAINT [DF_SysJwtSigningKey_CreatedAt]");
     }
 
     [Fact]
@@ -413,7 +289,7 @@ public class InlineConstraintFolderTests
             """
             CREATE TABLE [dbo].[Demo] (
                 [Id]   INT NOT NULL,
-                [Note] NVARCHAR (50) CONSTRAINT [DF_Demo_Note] DEFAULT ('hello') NULL
+                [Note] NVARCHAR (50) NULL
             );
             GO
             ALTER TABLE [dbo].[Demo]
@@ -421,8 +297,8 @@ public class InlineConstraintFolderTests
             GO
             """);
 
-        InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.None, NullLogger.Instance).ShouldBe(1);
-        InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.None, NullLogger.Instance).ShouldBe(0);
+        InlineConstraintFolder.FoldFile(path, NullLogger.Instance).ShouldBe(1);
+        InlineConstraintFolder.FoldFile(path, NullLogger.Instance).ShouldBe(0);
     }
 
     [Fact]
@@ -432,9 +308,9 @@ public class InlineConstraintFolderTests
         var path = dir.Write("Garbled.sql", "this is not valid T-SQL @@@");
 
         var before = File.ReadAllText(path);
-        var dropped = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.None, NullLogger.Instance);
+        var folded = InlineConstraintFolder.FoldFile(path, NullLogger.Instance);
 
-        dropped.ShouldBe(0);
+        folded.ShouldBe(0);
         File.ReadAllText(path).ShouldBe(before);
     }
 
@@ -452,7 +328,7 @@ public class InlineConstraintFolderTests
                  + "GO\n";
         var path = dir.Write("dbo/Tables/Demo.sql", lf);
 
-        InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.ModelFidelity, NullLogger.Instance);
+        InlineConstraintFolder.FoldFile(path, NullLogger.Instance);
 
         var after = File.ReadAllText(path);
         after.ShouldNotContain("\r", customMessage: "Lift introduced CRLF into a file that was LF-only.");
@@ -473,7 +349,7 @@ public class InlineConstraintFolderTests
                    + "GO\r\n";
         var path = dir.Write("dbo/Tables/Demo.sql", crlf);
 
-        InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.ModelFidelity, NullLogger.Instance);
+        InlineConstraintFolder.FoldFile(path, NullLogger.Instance);
 
         var after = File.ReadAllBytes(path);
         // Every LF must be preceded by CR — no stray lone LFs.
@@ -533,7 +409,7 @@ public class InlineConstraintFolderTests
                 + "END\n"
                 + "GO\n");
 
-        InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.ModelFidelity, NullLogger.Instance);
+        InlineConstraintFolder.FoldFile(path, NullLogger.Instance);
 
         var after = File.ReadAllText(path);
         // At most one blank line between any two sections — DacFx/lift should
@@ -556,87 +432,11 @@ public class InlineConstraintFolderTests
                     + "GO\n";
         var path = dir.Write("dbo/Tables/Demo.sql", input);
 
-        InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.ModelFidelity, NullLogger.Instance);
+        InlineConstraintFolder.FoldFile(path, NullLogger.Instance);
 
         var after = File.ReadAllText(path);
         after.ShouldNotContain("\n\n\n", customMessage: "Three consecutive newlines indicate an extra blank line.");
         after.ShouldEndWith("GO\n", customMessage: "File should end with GO + single newline, not extra trailing blanks.");
-    }
-
-    [Fact]
-    public void Mode_None_Preserves_Standalone_PrimaryKey()
-    {
-        using var dir = new TempDirectory();
-        var path = dir.Write(
-            "dbo/Tables/Demo.sql",
-            """
-            CREATE TABLE [dbo].[Demo] (
-                [Id] INT NOT NULL
-            );
-            GO
-            ALTER TABLE [dbo].[Demo]
-                ADD CONSTRAINT [PK_Demo] PRIMARY KEY CLUSTERED ([Id] ASC);
-            GO
-            """);
-
-        var before = File.ReadAllText(path);
-        var folded = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.None, NullLogger.Instance);
-
-        folded.ShouldBe(0);
-        File.ReadAllText(path).ShouldBe(before);
-    }
-
-    [Fact]
-    public void Mode_None_Preserves_Standalone_Default_With_No_Inline_Twin()
-    {
-        using var dir = new TempDirectory();
-        var path = dir.Write(
-            "dbo/Tables/Demo.sql",
-            """
-            CREATE TABLE [dbo].[Demo] (
-                [Id]   INT NOT NULL,
-                [Note] NVARCHAR (50) NULL
-            );
-            GO
-            ALTER TABLE [dbo].[Demo]
-                ADD CONSTRAINT [DF_Demo_Note] DEFAULT ('hello') FOR [Note];
-            GO
-            """);
-
-        var before = File.ReadAllText(path);
-        var folded = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.None, NullLogger.Instance);
-
-        folded.ShouldBe(0);
-        File.ReadAllText(path).ShouldBe(before);
-    }
-
-    [Fact]
-    public void Mode_None_Drops_Duplicate_Batch_But_Skips_Lift_Batch_In_Same_File()
-    {
-        using var dir = new TempDirectory();
-        var path = dir.Write(
-            "dbo/Tables/Demo.sql",
-            """
-            CREATE TABLE [dbo].[Demo] (
-                [Id] INT NOT NULL,
-                [Flag] BIT CONSTRAINT [DF_Demo_Flag] DEFAULT ((0)) NOT NULL
-            );
-            GO
-            ALTER TABLE [dbo].[Demo]
-                ADD CONSTRAINT [DF_Demo_Flag] DEFAULT ((0)) FOR [Flag];
-            GO
-            ALTER TABLE [dbo].[Demo]
-                ADD CONSTRAINT [PK_Demo] PRIMARY KEY CLUSTERED ([Id] ASC);
-            GO
-            """);
-
-        var folded = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.None, NullLogger.Instance);
-
-        // Pure-dup batch dropped (DF_Demo_Flag), lift batch (PK_Demo) preserved.
-        folded.ShouldBe(1);
-        var after = File.ReadAllText(path);
-        after.ShouldNotContain("ADD CONSTRAINT [DF_Demo_Flag]");
-        after.ShouldContain("ADD CONSTRAINT [PK_Demo]");
     }
 
     [Fact]
@@ -648,7 +448,7 @@ public class InlineConstraintFolderTests
             """
             CREATE TABLE [dbo].[Demo] (
                 [Id]   INT NOT NULL,
-                [Note] NVARCHAR (50) CONSTRAINT [DF_Demo_Note] DEFAULT ('hello') NULL
+                [Note] NVARCHAR (50) NULL
             );
             GO
 
@@ -670,11 +470,12 @@ public class InlineConstraintFolderTests
             GO
             """);
 
-        var dropped = InlineConstraintFolder.FoldFile(path, InlineConstraintsMode.None, NullLogger.Instance);
+        var folded = InlineConstraintFolder.FoldFile(path, NullLogger.Instance);
 
-        dropped.ShouldBe(1);
+        folded.ShouldBe(1);
         var after = File.ReadAllText(path);
         after.ShouldNotContain("ADD CONSTRAINT [DF_Demo_Note]");
+        after.ShouldContain("CONSTRAINT [DF_Demo_Note] DEFAULT");
         after.ShouldContain("CREATE UNIQUE NONCLUSTERED INDEX [Idx_Demo_Note]");
         after.ShouldContain("CREATE TRIGGER [dbo].[Tr_Demo_AfterInsert]");
     }

@@ -21,7 +21,7 @@ public sealed record SyncOptions
     /// Controls whether <see cref="SchemaSync.Apply"/> rewrites trailing
     /// <c>ALTER TABLE ADD CONSTRAINT</c> statements as inline constraints
     /// inside <c>CREATE TABLE</c>. Defaults to <see cref="InlineConstraintsMode.None"/>
-    /// — only the mandatory dedup pass runs.
+    /// — DacFx's output is left as is.
     /// </summary>
     public InlineConstraintsMode InlineConstraintsMode { get; init; } = InlineConstraintsMode.None;
 
